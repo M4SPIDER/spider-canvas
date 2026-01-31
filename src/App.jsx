@@ -1,41 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Home,
-  Star,
-  Send, 
-  Code2, 
-  Eye, 
-  Maximize2, 
-  Minimize2, 
-  ChevronRight, 
-  Sparkles, 
-  FileCode,
-  Share2,
-  Copy,
-  Check,
-  PanelRightClose,
-  PanelRightOpen,
-  Smartphone,
-  Tablet,
-  Monitor,
-  ArrowLeft,
-  Menu,
-  X,
-  Loader2,
-  GripVertical,
-  Database,
-  Trash2,
-  Play,
-  RotateCcw,
-  FastForward,
-  Bug,
-  Edit3
+  Home, Star, Send, Code2, Eye, Maximize2, Minimize2, ChevronRight, 
+  Sparkles, FileCode, Share2, Copy, Check, PanelRightClose, PanelRightOpen, 
+  Smartphone, Tablet, Monitor, ArrowLeft, Menu, X, Loader2, GripVertical, 
+  Database, Trash2, Play, RotateCcw, FastForward, Bug, Edit3, StopCircle,
+  Cpu, Terminal, Zap, Globe
 } from 'lucide-react';
 
 // --- Constants ---
 const DB_NAME = 'SpiderCanvasDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'session';
+const API_URL = "https://aistudio.m4spider.com/v1/chat";
+const API_KEY = "sk-spider-7309d97dc88de09b765f5c8f809720a49e63dbc65375c0d031313dc01bed63e2";
 
 // --- IndexedDB Helpers ---
 const initDB = () => {
@@ -106,17 +83,13 @@ const SpiderLogo = ({ className }) => (
     <path d="M12 4 L 12 18" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" opacity="0.7"/>
     
     {/* Legs (Circuit Traces) */}
-    {/* Top Left (L1, L2) */}
     <path d="M9 7 L 3 1 L 1 4" />
     <path d="M9 10 L 2 5 L 0 9" />
-    {/* Top Right (R1, R2) */}
     <path d="M15 7 L 21 1 L 23 4" />
     <path d="M15 10 L 22 5 L 24 9" />
     
-    {/* Bottom Left (L3, L4) */}
     <path d="M9 15 L 3 23 L 1 20" />
     <path d="M9 12 L 2 17 L 0 13" />
-    {/* Bottom Right (R3, R4) */}
     <path d="M15 15 L 21 23 L 23 20" />
     <path d="M15 12 L 22 17 L 24 13" />
     
@@ -143,8 +116,6 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
 
     // --- Template for React Components ---
     if (type === 'react') {
-      // FIX: Use JSON.stringify for safe code injection.
-      // This completely avoids issues with escaping scripts, regex patterns, or backslashes.
       const encodedCode = JSON.stringify(rawContent);
 
       blobContent = `
@@ -153,153 +124,224 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    
+    <!-- 1. CSS Framework -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+    
+    <!-- 2. Core Libraries (UMD Builds) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 3. Icon Library (Vanilla Lucide UMD) -->
+    <script src="https://unpkg.com/lucide@0.292.0/dist/umd/lucide.min.js"></script>
+    
+    <!-- 4. Compiler -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
       /* FORCE WHITE BACKGROUND FOR REACT APPS */
       html, body { 
-        font-family: sans-serif; 
-        margin: 0; 
-        padding: 0; 
-        background-color: #ffffff !important; 
-        height: 100vh; 
-        width: 100vw;
-        overflow: auto; 
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif; 
+        margin: 0; padding: 0; background-color: #ffffff; height: 100vh; width: 100vw; overflow: auto; 
       }
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-      #error-display { 
-        display: none; 
-        padding: 1.5rem; 
-        background: #fef2f2; 
-        color: #b91c1c; 
-        border-bottom: 1px solid #fecaca; 
-        font-family: monospace; 
-        font-size: 13px; 
-        white-space: pre-wrap;
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        z-index: 9999;
+      #root { width: 100%; min-height: 100vh; }
+      
+      /* Error Display */
+      #error-box { 
+        display: none; position: fixed; top: 0; left: 0; right: 0; 
+        background: #fef2f2; color: #b91c1c; border-bottom: 1px solid #fecaca; 
+        padding: 1rem; font-family: monospace; font-size: 12px; z-index: 10000;
       }
-      #root { width: 100%; min-height: 100vh; background-color: #ffffff; }
+      
+      /* Loading Spinner */
+      #loader {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: white; z-index: 9999; transition: opacity 0.5s;
+        flex-direction: column; gap: 1rem; color: #64748b; font-family: sans-serif;
+      }
+      .spinner { width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
-    <div id="error-display"></div>
+    <div id="error-box"></div>
+    <div id="loader">
+      <div class="spinner"></div>
+      <div id="loader-text" style="font-size: 12px;">Initializing Environment...</div>
+    </div>
     <div id="root"></div>
 
     <script>
-      // Inject User Code Safely
-      window.USER_CODE = ${encodedCode};
-
-      // 1. Error Handling
+      // 1. Error Handler
       window.onerror = function(msg, url, line, col, error) {
-        const errDiv = document.getElementById('error-display');
+        document.getElementById('loader').style.display = 'none';
+        const errDiv = document.getElementById('error-box');
         errDiv.style.display = 'block';
-        const cleanMsg = msg.replace('Uncaught Error: ', '');
-        errDiv.innerHTML = '<strong>⚠️ Runtime Error:</strong><br/>' + cleanMsg + '<br/><small>' + (url || '') + ':' + line + '</small>';
-        return false; 
+        errDiv.innerHTML = '<strong>Runtime Error:</strong><br/>' + msg + '<br/><small>' + (line ? 'Line: ' + line : '') + '</small>';
+        return false;
       };
 
-      // 2. Mocks
-      window.process = { env: { NODE_ENV: 'production' } };
-      window.exports = {};
-      window.module = { exports: window.exports };
+      // 2. Lucide Icons Setup
+      // We process the vanilla icons into a map for fast React lookup
+      window.LUCIDE_ICONS = {};
       
-      const LucideProxy = new Proxy({}, {
+      function initIcons() {
+        if (window.lucide && window.lucide.icons) {
+          const keys = Object.keys(window.lucide.icons);
+          keys.forEach(key => {
+            // 1. Store exact key
+            window.LUCIDE_ICONS[key] = window.lucide.icons[key];
+            
+            // 2. Store PascalCase version (arrow-right -> ArrowRight)
+            const pascalKey = key.split('-')
+              .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+              .join('');
+            window.LUCIDE_ICONS[pascalKey] = window.lucide.icons[key];
+            
+            // 3. Store Lowercase for fallback
+            window.LUCIDE_ICONS[key.toLowerCase()] = window.lucide.icons[key];
+          });
+        }
+      }
+
+      // 3. Lucide Proxy (The Connector)
+      const LucideIconProxy = new Proxy({}, {
         get: (target, prop) => {
           if (prop === '__esModule') return true;
-          if (prop === '$$typeof') return undefined;
+          
           return (props) => {
-            const { size = 24, className = '', ...rest } = props || {};
-            // Return a simple SVG without complex children props to avoid React warnings
-            return window.React.createElement('svg', {
-              width: size, height: size, viewBox: "0 0 24 24", 
-              fill: "none", stroke: "currentColor", strokeWidth: 2,
-              strokeLinecap: "round", strokeLinejoin: "round",
-              className: className, style: { color: 'currentColor' }, ...rest
-            }, window.React.createElement('rect', { x:2, y:2, width:20, height:20, rx:5, strokeDasharray: "4" })); 
-          };
+            const iconName = String(prop);
+            
+            // Lookup in our prepared map
+            let iconDef = window.LUCIDE_ICONS[iconName] || window.LUCIDE_ICONS[iconName.toLowerCase()];
+            
+            // Brute force fallback if map missed it
+            if (!iconDef && window.lucide && window.lucide.icons) {
+                const keys = Object.keys(window.lucide.icons);
+                const match = keys.find(k => k.toLowerCase() === iconName.toLowerCase() || k.replace(/-/g, '').toLowerCase() === iconName.toLowerCase());
+                if(match) iconDef = window.lucide.icons[match];
+            }
+
+            // Render Icon
+            if (iconDef && Array.isArray(iconDef)) {
+                const [tag, attrs, children] = iconDef;
+                
+                // Helper to recurse children - SAFE VERSION
+                const renderChildren = (childList) => {
+                    if (!Array.isArray(childList)) return [];
+
+                    return childList.map((child, i) => {
+                        if (!Array.isArray(child)) return null;
+                        const [cTag, cAttrs, cChildren] = child;
+                        return React.createElement(cTag, { ...cAttrs, key: i }, 
+                            renderChildren(cChildren)
+                        );
+                    });
+                };
+
+                return React.createElement('svg', {
+                    xmlns: "http://www.w3.org/2000/svg",
+                    width: props.size || 24,
+                    height: props.size || 24,
+                    viewBox: "0 0 24 24",
+                    fill: "none",
+                    stroke: props.color || "currentColor",
+                    strokeWidth: props.strokeWidth || 2,
+                    strokeLinecap: "round",
+                    strokeLinejoin: "round",
+                    ...props,
+                    className: props.className,
+                    style: { ...props.style, color: props.color || 'currentColor' }
+                }, renderChildren(children || []));
+            }
+
+            // Fallback if not found
+            return React.createElement('span', { 
+               style: { display: 'inline-block', width: 24, height: 24, border: '1px dashed #ef4444', borderRadius: 4, ...props.style },
+               title: 'Icon not found: ' + iconName
+            });
+          }
         }
       });
 
-      // ROBUST REQUIRE MOCK
-      window.require = function(moduleName) {
+      // 4. Module Shim
+      window.require = (moduleName) => {
         if (moduleName === 'react') return window.React;
         if (moduleName === 'react-dom') return window.ReactDOM;
-        if (moduleName === 'lucide-react') return LucideProxy;
+        if (moduleName === 'lucide-react') return LucideIconProxy;
         if (moduleName === 'recharts') return window.Recharts || {}; 
-        
-        console.warn('Mocking missing module:', moduleName);
-        
-        return new Proxy({}, {
-          get: (target, prop) => {
-            if (prop === '__esModule') return true;
-            return ({ children, ...props }) => {
-              return window.React.createElement('div', {
-                style: { 
-                  border: '1px dashed #f87171', 
-                  backgroundColor: '#fef2f2',
-                  padding: '4px',
-                  color: '#dc2626', 
-                  fontSize: '12px'
-                }
-              }, ['Missing: ' + moduleName + '.' + String(prop)]);
-            };
-          }
-        });
+        return {}; 
       };
+      
+      window.process = { env: { NODE_ENV: 'production' } };
+      window.exports = {};
+      window.module = { exports: window.exports };
 
-      // 3. Manual Compilation & Execution
-      try {
-        const userCode = window.USER_CODE;
-        if (!userCode || !userCode.trim()) throw new Error("No code to render");
-
-        const newline = String.fromCharCode(10);
-        const codeSuffix = newline + newline + 'if(typeof App !== "undefined") { window.App = App; }';
-        const finalCode = userCode + codeSuffix;
-
-        const compiled = Babel.transform(finalCode, { 
-          presets: [['env', { modules: 'commonjs' }], 'react'],
-          filename: 'user-code.js'
-        }).code;
-
-        new Function('require', 'module', 'exports', 'React', 'ReactDOM', compiled)(window.require, window.module, window.exports, window.React, window.ReactDOM);
-        
-        let ComponentToRender = window.module.exports.default || window.exports.default || window.App;
-        
-        if (!ComponentToRender && window.exports.App) ComponentToRender = window.exports.App;
-
-        if (ComponentToRender) {
-          const root = ReactDOM.createRoot(document.getElementById('root'));
-          root.render(React.createElement(ComponentToRender));
-        } else {
-          const entries = Object.entries(window.exports);
-          const firstComponent = entries.find(([key, val]) => typeof val === 'function');
-          if (firstComponent) {
-             const root = ReactDOM.createRoot(document.getElementById('root'));
-             root.render(React.createElement(firstComponent[1]));
-          } else {
-             throw new Error("Could not find a default export or 'App' component to render.");
+      // 5. Execution Logic
+      async function run() {
+        try {
+          // Wait for Lucide (poll for 3s)
+          let attempts = 0;
+          while ((!window.lucide || !window.lucide.icons) && attempts < 30) {
+            await new Promise(r => setTimeout(r, 100));
+            attempts++;
           }
-        }
+          
+          if (!window.lucide || !window.lucide.icons) {
+             console.warn("Lucide icons failed to load.");
+          } else {
+             initIcons(); // Build the index
+          }
 
-      } catch (err) {
-        const errDiv = document.getElementById('error-display');
-        errDiv.style.display = 'block';
-        errDiv.innerHTML = '<strong>🚫 Compilation/Render Error:</strong><br/>' + err.message;
-        console.error(err);
+          if (!window.React || !window.ReactDOM) throw new Error("React failed to load");
+          
+          const userCode = ${encodedCode};
+          
+          // Append bootstrap code
+          const fullCode = userCode + "\\n\\n" + \`
+            const rootEl = document.getElementById('root');
+            if (rootEl) {
+              const root = ReactDOM.createRoot(rootEl);
+              const AppComp = window.App || (typeof App !== 'undefined' ? App : null) || (window.module.exports.default);
+              if (AppComp) {
+                root.render(React.createElement(AppComp));
+              } else {
+                root.render(React.createElement('div', {style:{padding:20, color:'red'}}, 'No App component found. Export "App" as default.'));
+              }
+            }
+          \`;
+
+          const compiled = Babel.transform(fullCode, { 
+            presets: ['react', ['env', { modules: 'commonjs' }]],
+            filename: 'app.js'
+          }).code;
+
+          new Function('require', 'React', 'ReactDOM', 'module', 'exports', compiled)(
+            window.require, window.React, window.ReactDOM, window.module, window.exports
+          );
+
+          // Remove loader
+          const loader = document.getElementById('loader');
+          if (loader) {
+             loader.style.opacity = 0;
+             setTimeout(() => loader.remove(), 500);
+          }
+
+        } catch (e) {
+          window.onerror(e.message, '', '', '', e);
+        }
       }
+
+      run();
     </script>
   </body>
 </html>`;
     } 
-    // --- Template for HTML/JS (Games, Static Sites, WebGL) ---
+    // --- HTML Fallback ---
     else if (type === 'html') {
       const safeHtmlContent = rawContent;
-
       blobContent = `
 <!DOCTYPE html>
 <html>
@@ -307,70 +349,15 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> 
-    <style>
-      html, body { 
-        margin: 0; 
-        padding: 0; 
-        width: 100%; 
-        height: 100%; 
-        background: #000000;
-        overflow: hidden;
-        color: white;
-      }
-      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-      #error-container { 
-        position: absolute; top: 0; left: 0; right: 0; 
-        background: rgba(220, 38, 38, 0.9); color: white; 
-        padding: 10px; font-family: monospace; font-size: 12px; 
-        z-index: 9999; display: none; pointer-events: auto;
-      }
-    </style>
+    <style>html,body{margin:0;height:100%;background:#000;color:white;}</style>
   </head>
   <body>
-    <div id="error-container"></div>
-    <canvas id="gameCanvas"></canvas>
-    
-    <script>
-      window.onerror = function(msg, url, line, col, error) {
-        const div = document.getElementById('error-container');
-        div.style.display = 'block';
-        div.innerHTML = 'RUNTIME ERROR: ' + msg + ' (Line: ' + line + ')';
-        return false;
-      };
-
-      (function() {
-        const _systemCanvas = document.getElementById('gameCanvas');
-        const _resize = () => {
-          if(_systemCanvas) {
-              _systemCanvas.width = window.innerWidth;
-              _systemCanvas.height = window.innerHeight;
-          }
-        };
-        window.addEventListener('resize', _resize);
-        _resize();
-      })();
-    </script>
-
-    <!-- User Code -->
-    <div id="root" style="position: absolute; inset: 0; pointer-events: none;">
-      <div style="pointer-events: auto; width: 100%; height: 100%;">
-        ` + safeHtmlContent + `
-      </div>
-    </div>
+    ${safeHtmlContent}
   </body>
 </html>`;
-    } 
-    // --- Fallback ---
-    else {
+    } else {
       const safeFallbackContent = rawContent.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      blobContent = `
-<!DOCTYPE html>
-<html>
-  <body style="margin:0;padding:1rem;background:#ffffff;color:#333;">
-    <pre style="white-space: pre-wrap; font-family: monospace; font-size: 14px;">` + safeFallbackContent + `</pre>
-  </body>
-</html>`;
+      blobContent = `<html><body style="margin:0;padding:1rem;background:#fff;"><pre style="font-family:monospace;">` + safeFallbackContent + `</pre></body></html>`;
     }
 
     const blob = new Blob([blobContent], { type: 'text/html' });
@@ -382,40 +369,15 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
 
   const getContainerStyle = () => {
     switch (deviceMode) {
-      case 'mobile': return { 
-        width: '375px', 
-        height: '100%', 
-        maxHeight: '667px', 
-        borderRadius: '2rem', 
-        border: '8px solid #1e293b', 
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        backgroundColor: 'white'
-      };
-      case 'tablet': return { 
-        width: '768px', 
-        height: '100%', 
-        maxHeight: '1024px', 
-        borderRadius: '1.5rem', 
-        border: '8px solid #1e293b', 
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        backgroundColor: 'white'
-      };
-      default: return { 
-        width: '100%', 
-        height: '100%', 
-        borderRadius: '0', 
-        border: 'none',
-        backgroundColor: 'white' 
-      };
+      case 'mobile': return { width: '375px', height: '100%', maxHeight: '667px', borderRadius: '2rem', border: '8px solid #1e293b', backgroundColor: 'white' };
+      case 'tablet': return { width: '768px', height: '100%', maxHeight: '1024px', borderRadius: '1.5rem', border: '8px solid #1e293b', backgroundColor: 'white' };
+      default: return { width: '100%', height: '100%', borderRadius: '0', border: 'none', backgroundColor: 'white' };
     }
   };
 
   return (
     <div className={`w-full h-full flex items-center justify-center bg-slate-100 transition-all duration-300 ${deviceMode !== 'desktop' ? 'p-4 md:p-8' : ''}`}>
-      <div 
-        style={getContainerStyle()} 
-        className="relative overflow-hidden transition-all duration-500 ease-in-out origin-center bg-white"
-      >
+      <div style={getContainerStyle()} className="relative overflow-hidden transition-all duration-500 ease-in-out origin-center bg-white">
         <iframe 
           ref={iframeRef} 
           title="Artifact Preview"
@@ -428,17 +390,14 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
   );
 };
 
-/**
- * Main Application
- */
 export default function App() {
   
-  // --- DEFAULT ARTIFACT: 3D WELCOME SCREEN (REACT VERSION) ---
+  // --- DEFAULT ARTIFACT ---
   const defaultArtifact = {
     title: "Spider Canvas Home",
     language: "react",
     code: `import React from 'react';
-import { Sparkles, Terminal, Cpu, Zap } from 'lucide-react';
+import { Sparkles, Terminal, Cpu, Zap, Radio } from 'lucide-react';
 
 export default function App() {
   return (
@@ -474,16 +433,16 @@ export default function App() {
             </h1>
             
             <p className="text-slate-400 text-lg md:text-xl mb-10 leading-relaxed max-w-lg">
-              Next-gen AI Game Architect.<br/>
-              <span className="text-cyan-400 font-medium">React Native.</span> <span className="text-blue-400 font-medium">WebGL.</span> <span className="text-indigo-400 font-medium">Full Stack.</span>
+              Advanced Stream Architecture.<br/>
+              <span className="text-cyan-400 font-medium">Real-time.</span> <span className="text-blue-400 font-medium">Full Code.</span> <span className="text-indigo-400 font-medium">KV Memory.</span>
             </p>
 
             {/* Feature Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-8">
               {[
-                { icon: Terminal, label: "Clean Code", color: "text-emerald-400" },
-                { icon: Zap, label: "Instant Preview", color: "text-yellow-400" },
-                { icon: Sparkles, label: "Auto-Fix", color: "text-purple-400" }
+                { icon: Terminal, label: "Complete Code", color: "text-emerald-400" },
+                { icon: Zap, label: "Fast Streaming", color: "text-yellow-400" },
+                { icon: Radio, label: "Live Preview", color: "text-purple-400" }
               ].map((item, i) => (
                 <div key={i} className="flex items-center justify-center gap-2 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition">
                   <item.icon className={\`w-4 h-4 \${item.color}\`} />
@@ -496,10 +455,7 @@ export default function App() {
             <div className="flex gap-3">
               <div className="px-4 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-400 flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                System Online
-              </div>
-              <div className="px-4 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-slate-500">
-                v2.1.0-React
+                v9.9.80 Stable
               </div>
             </div>
 
@@ -520,7 +476,7 @@ export default function App() {
     { 
       id: 1, 
       role: 'assistant', 
-      text: "System initialized. 🕷️\n\nI am the Ultimate Game Designer. I can build 3D WebGL games, physics simulations, and React apps.\n\nTry:\n- \"Create a Snow Brothers style platformer\"\n- \"Build a 3D space shooter with three.js\"\n- \"Make a physics based puzzle game\"",
+      text: "System Online. 🕷️\n\nI am the Ultimate Game Designer. I now support **Real-Time Streaming** and **Full Code Generation**.\n\nTry:\n- \"Create a YouTube UI clone\"\n- \"Build a 3D space shooter\"\n- \"Make a complex dashboard\"",
       artifact: defaultArtifact
     }
   ]);
@@ -532,6 +488,7 @@ export default function App() {
   const [isCanvasOpen, setIsCanvasOpen] = useState(false); 
   const [isCopied, setIsCopied] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
     
@@ -541,9 +498,19 @@ export default function App() {
   
   // NEW: Session ID for KV Memory Management
   const [sessionId, setSessionId] = useState("");
+  const abortControllerRef = useRef(null);
 
   // Ref for Full Screen
   const canvasContainerRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
 
   // --- Effects ---
 
@@ -680,116 +647,222 @@ export default function App() {
     }
   };
 
-  // --- API Handlers ---
+  // --- API Handlers (Streaming) ---
 
-  // UPDATED: Accepts sessionId and optional explicitMode
-  const callGeminiAPI = async (prompt, currentArtifact, sId, explicitMode = "chat") => {
-    const API_KEY = "sk-spider-7309d97dc88de09b765f5c8f809720a49e63dbc65375c0d031313dc01bed63e2";
+  const generateStream = async (prompt, explicitMode = "chat") => {
+    abortControllerRef.current = new AbortController();
     
-    const systemInstruction = `
+    // Aggressive System Instruction for Full Code
+    const SYSTEM_INSTRUCTION = `
       You are "Spider", the Ultimate Game Designer & Full-Stack Architect.
       
-      YOUR MISSION:
-      Create "Ultimate" games and web apps. Your code must be 100% complete, self-contained, and bug-free.
-      
       CRITICAL MANDATES:
-      1. **NO TRUNCATION**: You must generate every single line of code. Never use placeholders like "// ...rest of code" or "// ...existing logic". DO NOT truncate long files. Output the complete functional code.
-      2. **PRODUCTION READY**: Code must run immediately in the browser iframe.
+      1. **NO TRUNCATION**: You must generate every single line of code. Never use placeholders like "// ...rest of code" or "// ...existing logic".
+      2. **SINGLE FILE**: Output all code (HTML, CSS, JS) in a single file format.
       3. **VISUAL PERFECTION**: Use modern, polished UI design (Tailwind CSS).
-      4. **GAME LOGIC**: Ensure games have robust loops (requestAnimationFrame), score tracking, and restart mechanics.
-      5. **RENDERING FIX**: For HTML games, ALWAYS use the provided <canvas id="gameCanvas"> or create a canvas that fills the screen (width=window.innerWidth, height=window.innerHeight).
-      6. always React : you always need to  write best react ui codes like professinonal level and always full and perfect.
+      4. **REACT EXPERT**: Write professional-grade React code (Components, Hooks).
+      
       RESPONSE FORMAT:
-      {
-        "text": "Brief, professional response confirming the build.",
-        "artifact": {
-          "title": "Title of the App/Game",
-          "language": "html" or "react", 
-          "code": "FULL CODE STRING" 
-        }
-      }
-
-      TECHNICAL RULES:
-      - Use Tailwind CSS.
-      - For HTML Games: Use <canvas>, visible backgrounds, and proper z-index for overlays.
-      - For React: Use functional components + hooks.
+      Start with a brief conversational response, then provide the code block.
+      \`\`\`react
+      // Complete code here
+      \`\`\`
     `;
 
+    // Context from current artifact
     let context = "";
-    if (currentArtifact && currentArtifact.code) {
-      context = `
-      Here is the CURRENT CODE you should modify or explain:
-      ${currentArtifact.code}
-
-      Instructions:
-      1. If the user asks to modify the code, return the FULL updated code.
-      2. If the user asks to explain, provide a text explanation.
-      `;
+    if (activeArtifact && activeArtifact.code) {
+      context = `\n\n[CURRENT CODE CONTEXT]:\n${activeArtifact.code.substring(0, 10000)}\n\n[INSTRUCTION]: If editing, provide the FULL new code. Do not return diffs.`;
     }
 
-    const finalPrompt = `${systemInstruction}\n\n${context}\n\nUser Request: ${prompt}`;
+    const finalPrompt = `${SYSTEM_INSTRUCTION}${context}\n\nUser Request: ${prompt}`;
 
     try {
-      console.log("🚀 Sending Request to AI Studio...");
-      
-      const response = await fetch("https://aistudio.m4spider.com/v1/chat", {
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "X-API-Key": API_KEY
+          "X-API-Key": API_KEY 
         },
         body: JSON.stringify({
           prompt: finalPrompt,
-          mode: explicitMode, // Pass mode (e.g., delete_all or chat)
-          session_id: sId // VITAL: Send session_id for backend memory mapping
-        })
+          mode: explicitMode === "delete_all" ? "delete_all" : "stream", // Use 'stream' mode for chat
+          stream: true, // Explicitly enable streaming
+          session_id: sessionId
+        }),
+        signal: abortControllerRef.current.signal
       });
 
-      console.log(`📡 Status Code: ${response.status}`);
-
       if (!response.ok) throw new Error(`API call failed: ${response.status}`);
-      
-      const data = await response.json();
-      
-      // Handle non-chat responses (like delete confirmation)
+
+      // Handle Non-Streaming Responses (Delete All)
       if (explicitMode === "delete_all") {
-          return { text: data.message || "Memory deleted.", artifact: null };
+        const data = await response.json();
+        return { text: data.message, isStream: false };
       }
 
-      const content = data.response;
+      // Handle Streaming
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let isCodeBlockOpen = false;
+      let currentCode = "";
+      let currentLanguage = "";
+      
+      setIsStreaming(true);
+      
+      // Auto-open canvas on stream start
+      if (window.innerWidth >= 768) setIsCanvasOpen(true);
 
-      if (!content) throw new Error('No content received from API');
-      
-      console.log("%c✅ SUCCESS! System is online.", "color: green; font-size: 14px; font-weight: bold;");
-      
-      const jsonStr = content.replace(/```json\n?|\n?```/g, '');
-      return JSON.parse(jsonStr);
-      
+      // Create a temporary message for streaming
+      setMessages(prev => [
+        ...prev, 
+        { id: 'streaming', role: 'assistant', text: '', artifact: null }
+      ]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') break;
+            
+            try {
+              const parsed = JSON.parse(dataStr);
+              const textChunk = parsed.text || parsed.response || "";
+              
+              if (textChunk) {
+                fullText += textChunk;
+                
+                // --- Real-time Code Extraction Logic ---
+                // We parse the full text to detect code blocks
+                // This is a simplified state machine for streaming
+                
+                const codeBlockStart = fullText.lastIndexOf('```');
+                
+                if (codeBlockStart !== -1) {
+                  // Check if we have a closing block after the start (rare in partial stream but possible)
+                  const codeBlockEnd = fullText.indexOf('```', codeBlockStart + 3);
+                  
+                  // Extract language
+                  const headerEnd = fullText.indexOf('\n', codeBlockStart);
+                  if (headerEnd !== -1) {
+                      const lang = fullText.substring(codeBlockStart + 3, headerEnd).trim().toLowerCase();
+                      if (lang === 'react' || lang === 'jsx' || lang === 'html' || lang === 'javascript') {
+                        currentLanguage = lang === 'jsx' ? 'react' : lang;
+                        
+                        // Extract content
+                        let codeContent = "";
+                        if (codeBlockEnd !== -1) {
+                           codeContent = fullText.substring(headerEnd + 1, codeBlockEnd);
+                        } else {
+                           codeContent = fullText.substring(headerEnd + 1);
+                        }
+
+                        // Update Artifact in Real-Time
+                        if (codeContent.trim().length > 10) {
+                           const liveArtifact = {
+                             title: "Generating...",
+                             language: currentLanguage,
+                             code: codeContent
+                           };
+                           setActiveArtifact(liveArtifact);
+                           setIsCanvasOpen(true);
+                           
+                           // Update message with artifact
+                           setMessages(prev => prev.map(msg => 
+                             msg.id === 'streaming' ? { ...msg, artifact: liveArtifact } : msg
+                           ));
+                        }
+                      }
+                  }
+                }
+
+                // Update text in chat
+                setMessages(prev => prev.map(msg => 
+                  msg.id === 'streaming' 
+                    ? { ...msg, text: fullText } 
+                    : msg
+                ));
+              }
+            } catch (e) {
+               // Ignore partial JSON parse errors
+            }
+          }
+        }
+      }
+
+      return { text: fullText, isStream: true };
+
     } catch (error) {
-      console.error("💥 Network/Parsing Error:", error);
-      return {
-        text: "I'm sorry, I encountered an error while processing your request. Please try again.",
-        artifact: null
-      };
+      if (error.name === 'AbortError') {
+        return { text: "Generation stopped by user.", isStream: true };
+      }
+      throw error;
+    } finally {
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   };
 
+  const extractArtifact = (text) => {
+    // Regex to find code blocks: ```language ... ```
+    const codeBlockRegex = /```(\w+)\n([\s\S]*?)```/;
+    const match = text.match(codeBlockRegex);
+    
+    if (match) {
+      const language = match[1].toLowerCase();
+      let code = match[2];
+      
+      // Basic cleanup
+      if (language === 'react' || language === 'jsx' || language === 'javascript') {
+        return {
+          title: "Generated App",
+          language: "react",
+          code: code
+        };
+      } else if (language === 'html') {
+        return {
+          title: "Generated Page",
+          language: "html",
+          code: code
+        };
+      }
+    }
+    return null;
+  };
+
+  // --- CHANGED: Helper to filter code blocks from chat text ---
+  const getDisplayText = (text, role) => {
+    if (role !== 'assistant') return text;
+    // 1. Remove complete code blocks
+    let clean = text.replace(/```[\w]*\n[\s\S]*?```/g, '');
+    // 2. Remove incomplete streaming code blocks
+    clean = clean.replace(/```[\w]*\n?[\s\S]*$/, '');
+    return clean.trim();
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
+    if (!input.trim() || isTyping || isStreaming) return;
     
     const userText = input;
     const cleanPrompt = userText.trim().toLowerCase();
-
-    // --- SPECIAL COMMAND: DELETE ALL (FIXED) ---
+    
+    // --- SPECIAL COMMAND: DELETE ALL ---
     if (cleanPrompt === "delete all") {
       setInput("");
       setIsTyping(true);
       
       try {
-        // 1. Send Command to Backend to clear KV using the current session ID
-        await callGeminiAPI("delete all", null, sessionId, "delete_all");
+        // 1. Send Command to Backend FIRST to clear KV
+        await generateStream("delete all", "delete_all");
 
-        // 2. Clear Local State
+        // 2. Only if successful, Clear Local State
         setMessages([{ 
           id: Date.now(), 
           role: 'assistant', 
@@ -799,18 +872,18 @@ export default function App() {
         setActiveArtifact(null);
         await clearDB();
         
-        // 3. Generate NEW Session ID to ensure complete separation
+        // 3. Generate NEW Session ID
         const newSid = crypto.randomUUID();
         setSessionId(newSid);
         await saveToDB('spider_session_id', newSid);
         
-        console.log("KV and Local Memory cleared. New Session Started.");
+        console.log("KV and Local Memory cleared.");
       } catch (e) { 
         console.error("Sync error:", e); 
         setMessages(prev => [...prev, {
             id: Date.now(),
             role: 'assistant',
-            text: "Error clearing backend memory, but local reset done.",
+            text: "Error clearing backend memory. Please try again.",
             artifact: null
         }]);
       } finally {
@@ -826,25 +899,29 @@ export default function App() {
     setIsTyping(true);
 
     try {
-      const result = await callGeminiAPI(userText, activeArtifact, sessionId);
-      const aiMsg = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        text: result.text,
-        artifact: result.artifact
-      };
-
-      setMessages(prev => [...prev, aiMsg]);
+      const result = await generateStream(userText);
       
-      if (result.artifact) {
-        setActiveArtifact(result.artifact);
+      // Finalize the streaming message
+      const finalArtifact = extractArtifact(result.text);
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === 'streaming' 
+          ? { ...msg, id: Date.now() + 1, artifact: finalArtifact } 
+          : msg
+      ));
+
+      if (finalArtifact) {
+        setActiveArtifact(finalArtifact);
         if (window.innerWidth < 768) setIsCanvasOpen(true);
       }
+      
     } catch (error) {
+      console.error(error);
+      setMessages(prev => prev.filter(msg => msg.id !== 'streaming')); // Remove failed stream
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',
-        text: "Sorry, something went wrong. Please check your connection and try again.",
+        text: "Sorry, I encountered an error. Please try again.",
         artifact: null
       }]);
     } finally {
@@ -852,108 +929,18 @@ export default function App() {
     }
   };
 
-  const handleContinue = async () => {
-    if (isTyping) return;
-    const userText = "continue";
-    
-    const newUserMsg = { id: Date.now(), role: 'user', text: "⏩ Auto-Continue" };
-    setMessages(prev => [...prev, newUserMsg]);
-    setIsTyping(true);
-
-    try {
-      const result = await callGeminiAPI(userText, activeArtifact, sessionId);
-      const aiMsg = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        text: result.text,
-        artifact: result.artifact
-      };
-
-      setMessages(prev => [...prev, aiMsg]);
-      
-      if (result.artifact) {
-        setActiveArtifact(result.artifact);
-        if (window.innerWidth < 768) setIsCanvasOpen(true);
-      }
-    } catch (error) {
-      setMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        role: 'assistant',
-        text: "Could not auto-continue. Please try again.",
-        artifact: null
-      }]);
-    } finally {
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsStreaming(false);
       setIsTyping(false);
     }
   };
 
   const handleAutoFix = async () => {
-    if (isTyping) return;
-    const userText = "Fix bugs and regenerate 100% complete code. Ensure the canvas renders correctly and is visible. If this is a React app, ensure the App component is exported correctly."; 
-    
-    const newUserMsg = { id: Date.now(), role: 'user', text: "🐞 Auto-Debug / Fix" };
-    setMessages(prev => [...prev, newUserMsg]);
-    setIsTyping(true);
-
-    try {
-      const result = await callGeminiAPI(userText, activeArtifact, sessionId);
-      const aiMsg = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        text: result.text,
-        artifact: result.artifact
-      };
-
-      setMessages(prev => [...prev, aiMsg]);
-      
-      if (result.artifact) {
-        setActiveArtifact(result.artifact);
-        if (window.innerWidth < 768) setIsCanvasOpen(true);
-      }
-    } catch (error) {
-       console.error(error);
-       setMessages(prev => [...prev, {
-         id: Date.now() + 1,
-         role: 'assistant',
-         text: "Auto-fix failed. Please try again.",
-         artifact: null
-       }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  // --- Message Listener for Auto-Fix ---
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data && event.data.type === 'AUTO_FIX_REQUEST') {
-        if (!isTyping) {
-          handleAutoFix();
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [isTyping, handleAutoFix]);
-
-  const handleExplainCode = async () => {
-    if (!activeArtifact || isTyping) return;
-    const prompt = "Please explain the current code displayed in the canvas. Highlight the key design choices and structure.";
-    const userMsg = { id: Date.now(), role: 'user', text: "✨ Explain this code" };
-    setMessages(prev => [...prev, userMsg]);
-    setIsTyping(true);
-    try {
-      const result = await callGeminiAPI(prompt, activeArtifact, sessionId);
-      const aiMsg = { id: Date.now() + 1, role: 'assistant', text: result.text, artifact: null };
-      setMessages(prev => [...prev, aiMsg]);
-      if (window.innerWidth < 768) setIsCanvasOpen(false);
-    } catch (error) {
-       console.error(error);
-       setIsTyping(false);
-    } finally {
-      setIsTyping(false);
-    }
+    if (isTyping || isStreaming) return;
+    setInput("Fix bugs and regenerate 100% complete code.");
+    setTimeout(handleSend, 0);
   };
 
   const copyCode = () => {
@@ -997,19 +984,22 @@ export default function App() {
         )}
         
         {/* Header */}
-        <header className="h-14 min-h-[3.5rem] border-b border-slate-100 flex items-center justify-between px-4 bg-white sticky top-0 z-20">
+        <header className="h-14 min-h-[3.5rem] border-b border-slate-100 flex items-center justify-between px-4 bg-white/90 backdrop-blur sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {/* REAL SPIDER LOGO */}
-            <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shadow-lg shadow-slate-400/50">
-               <SpiderLogo className="w-6 h-6 text-cyan-400" />
+            <div className="w-9 h-9 bg-slate-900 rounded-lg flex items-center justify-center shadow-lg shadow-slate-400/50">
+               <SpiderLogo className="w-5 h-5 text-cyan-400" />
             </div>
             {/* BRAND NAME */}
-            <span className="font-bold text-slate-900 tracking-tight">Spider Canvas 🕷️</span>
+            <div>
+              <span className="block font-bold text-slate-900 tracking-tight leading-none">Spider</span>
+              <span className="block text-[10px] text-indigo-500 font-medium tracking-widest leading-none">CANVAS</span>
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
             {isDataLoaded && (
-              <span className="text-[10px] text-slate-400 flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+              <span className="hidden sm:flex text-[10px] text-slate-400 items-center gap-1 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
                 <Database className="w-3 h-3" />
                 Saved
               </span>
@@ -1030,18 +1020,24 @@ export default function App() {
           {!isDataLoaded ? (
             <div className="flex h-full items-center justify-center text-slate-400 gap-2">
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span className="text-sm">Restoring session...</span>
+              <span className="text-sm">Initializing memory...</span>
             </div>
           ) : (
             messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed ${
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300`}>
+                <div className={`max-w-[90%] md:max-w-[85%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed relative ${
                   msg.role === 'user' 
                   ? 'bg-slate-900 text-white rounded-tr-none' 
                   : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
                 }`}>
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                  {/* CHANGED: Use getDisplayText to hide code blocks */}
+                  <p className="whitespace-pre-wrap">{getDisplayText(msg.text, msg.role)}</p>
                   
+                  {/* Streaming Cursor (only show if valid text is streaming) */}
+                  {msg.id === 'streaming' && isStreaming && !msg.artifact && (
+                    <span className="inline-block w-2 h-4 bg-indigo-500 ml-1 animate-pulse align-middle"></span>
+                  )}
+
                   {msg.artifact && (
                     <button 
                       onClick={() => {
@@ -1064,48 +1060,40 @@ export default function App() {
               </div>
             ))
           )}
-          
-          {isTyping && (
-             <div className="flex justify-start">
-               <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-none p-4 shadow-sm flex items-center gap-2">
-                 <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
-                 <span className="text-sm text-slate-500">Thinking...</span>
-               </div>
-             </div>
-          )}
-          <div className="h-4" /> 
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur border-t border-slate-100">
-          <div className="relative flex items-end gap-2 bg-slate-100 rounded-3xl p-2 border border-transparent focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100 transition duration-300">
+          <div className="relative flex items-end gap-2 bg-slate-100 rounded-3xl p-2 border border-transparent focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100 transition duration-300 shadow-inner">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-              placeholder="Type your request here..."
+              placeholder="Ask Spider to build something..."
               rows={1}
-              className="w-full pl-4 py-3 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400 resize-none max-h-32"
+              disabled={isStreaming}
+              className="w-full pl-4 py-3 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400 resize-none max-h-32 disabled:opacity-50"
               style={{ minHeight: '44px' }} 
             />
             
-            {/* Auto Continue Button */}
-            <button 
-              onClick={handleContinue}
-              disabled={isTyping}
-              className="p-3 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-full transition shadow-sm flex-shrink-0 mb-[1px]"
-              title="Auto Continue (Finish stream)"
-            >
-              <FastForward className="w-4 h-4" />
-            </button>
-
-            <button 
-              onClick={handleSend}
-              disabled={!input.trim() || isTyping}
-              className="p-3 bg-slate-900 text-white rounded-full hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md flex-shrink-0 mb-[1px]"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+            {isStreaming ? (
+              <button 
+                onClick={handleStop}
+                className="p-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition shadow-md flex-shrink-0 mb-[1px]"
+                title="Stop Generation"
+              >
+                <StopCircle className="w-4 h-4" />
+              </button>
+            ) : (
+              <button 
+                onClick={handleSend}
+                disabled={!input.trim() || isTyping}
+                className="p-3 bg-slate-900 text-white rounded-full hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md flex-shrink-0 mb-[1px] group"
+              >
+                {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1129,17 +1117,17 @@ export default function App() {
             </button>
 
             <h2 className="font-semibold text-slate-800 truncate flex items-center gap-2 text-sm md:text-base">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-indigo-500 animate-ping' : 'bg-green-500'} `}></span>
               {activeArtifact?.title || "New Session"}
             </h2>
           </div>
 
           <div className="flex items-center gap-2">
             
-            {/* Auto-Fix / Debug Button (FIXED: Visible on Mobile) */}
+            {/* Auto-Fix / Debug Button */}
             <button 
               onClick={handleAutoFix}
-              disabled={isTyping}
+              disabled={isTyping || isStreaming}
               title="Fix Bugs / Regenerate Code"
               className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition mr-1"
             >
@@ -1147,39 +1135,20 @@ export default function App() {
               Fix
             </button>
 
-            {/* Explain Button */}
-            <button 
-              onClick={handleExplainCode}
-              disabled={isTyping}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold hover:from-amber-100 hover:to-orange-100 transition mr-2"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Explain
-            </button>
-
             {/* Device Toggles (Desktop Only) */}
             <div className="hidden md:flex bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
-              <button 
-                onClick={() => setDeviceMode('mobile')}
-                title="Mobile View"
-                className={`p-1.5 rounded-md transition ${deviceMode === 'mobile' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <Smartphone className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setDeviceMode('tablet')}
-                title="Tablet View"
-                className={`p-1.5 rounded-md transition ${deviceMode === 'tablet' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <Tablet className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setDeviceMode('desktop')}
-                title="Desktop View"
-                className={`p-1.5 rounded-md transition ${deviceMode === 'desktop' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <Monitor className="w-4 h-4" />
-              </button>
+              {['mobile', 'tablet', 'desktop'].map((mode) => (
+                <button 
+                  key={mode}
+                  onClick={() => setDeviceMode(mode)}
+                  title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} View`}
+                  className={`p-1.5 rounded-md transition ${deviceMode === mode ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {mode === 'mobile' ? <Smartphone className="w-4 h-4" /> : 
+                   mode === 'tablet' ? <Tablet className="w-4 h-4" /> : 
+                   <Monitor className="w-4 h-4" />}
+                </button>
+              ))}
             </div>
 
             {/* View Mode Toggle */}
@@ -1213,7 +1182,7 @@ export default function App() {
               {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
             </button>
 
-            {/* Actions (Copy/Share) */}
+            {/* Actions (Copy) */}
             <div className="hidden sm:flex items-center gap-1 border-l border-slate-200 pl-2 ml-1">
               <button 
                 onClick={copyCode}
@@ -1274,4 +1243,3 @@ export default function App() {
     </div>
   );
 }
-
