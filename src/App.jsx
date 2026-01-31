@@ -12,7 +12,7 @@ const DB_NAME = 'SpiderCanvasDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'session';
 const API_URL = "https://aistudio.m4spider.com/v1/chat";
-const API_KEY = "sk-spider-7309d97dc88de09b765f5c8f809720a49e63dbc65375c0d031313dc01bed63e2";
+const API_KEY = "sk-spider-114f1baf90a23a4e346596d29df7d6b71365577a768d2c2cacc5f15b0497f018";
 
 // --- IndexedDB Helpers ---
 const initDB = () => {
@@ -1243,3 +1243,4 @@ export default function App() {
     </div>
   );
 }
+
