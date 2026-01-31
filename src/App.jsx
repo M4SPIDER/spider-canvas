@@ -535,6 +535,15 @@ export default function App() {
 }`
   };
 
+  // --- Session Management ---
+  const [sessionId] = useState(() => {
+    const stored = localStorage.getItem('spider_session_id');
+    if (stored) return stored;
+    const newId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('spider_session_id', newId);
+    return newId;
+  });
+
   const [messages, setMessages] = useState([
     { 
       id: 1, 
@@ -685,7 +694,7 @@ export default function App() {
 
   // --- API Handlers ---
 
-  const callGeminiAPI = async (prompt, currentArtifact) => {
+  const callGeminiAPI = async (prompt, currentArtifact, sessId) => {
     const API_KEY = "sk-spider-7309d97dc88de09b765f5c8f809720a49e63dbc65375c0d031313dc01bed63e2";
     
     const systemInstruction = `
@@ -742,7 +751,8 @@ export default function App() {
         },
         body: JSON.stringify({
           prompt: finalPrompt,
-          mode: "chat"
+          mode: "chat",
+          session_id: sessId // Pass the persistent session ID
         })
       });
 
@@ -775,26 +785,34 @@ export default function App() {
     const userText = input;
     const cleanPrompt = userText.trim().toLowerCase();
 
-    // --- SPECIAL COMMAND: DELETE ALL ---
+    // --- SPECIAL COMMAND: DELETE ALL (Backend KV Only) ---
     if (cleanPrompt === "delete all") {
       setInput("");
-      setMessages([{ 
+      
+      // We append a system message instead of wiping local state
+      // This satisfies "only delete memory of kv" while preserving UI history
+      const wipeMsg = { 
         id: Date.now(), 
         role: 'assistant', 
-        text: "Memory wiped successfully 🧠💨", 
+        text: "🧠 Backend memory wiped successfully. Local history preserved.", 
         artifact: null 
-      }]);
-      setActiveArtifact(null);
-      await clearDB();
+      };
+      setMessages(prev => [...prev, wipeMsg]);
       
       try {
         await fetch("https://aistudio.m4spider.com/v1/chat", {
-          method: "delete all", 
+          method: "POST", 
           headers: { 
+            "Content-Type": "application/json",
             "X-API-Key": "sk-spider-7309d97dc88de09b765f5c8f809720a49e63dbc65375c0d031313dc01bed63e2" 
-          }
+          },
+          body: JSON.stringify({
+            prompt: "delete all",
+            mode: "delete_all",
+            session_id: sessionId // Identifies which memory to wipe
+          })
         });
-        console.log("Backend memory cleared");
+        console.log("Backend memory cleared for session:", sessionId);
       } catch (e) { 
         console.error("Sync error:", e); 
       }
@@ -808,7 +826,7 @@ export default function App() {
     setIsTyping(true);
 
     try {
-      const result = await callGeminiAPI(userText, activeArtifact);
+      const result = await callGeminiAPI(userText, activeArtifact, sessionId);
       const aiMsg = {
         id: Date.now() + 1,
         role: 'assistant',
@@ -843,7 +861,7 @@ export default function App() {
     setIsTyping(true);
 
     try {
-      const result = await callGeminiAPI(userText, activeArtifact);
+      const result = await callGeminiAPI(userText, activeArtifact, sessionId);
       const aiMsg = {
         id: Date.now() + 1,
         role: 'assistant',
@@ -878,7 +896,7 @@ export default function App() {
     setIsTyping(true);
 
     try {
-      const result = await callGeminiAPI(userText, activeArtifact);
+      const result = await callGeminiAPI(userText, activeArtifact, sessionId);
       const aiMsg = {
         id: Date.now() + 1,
         role: 'assistant',
@@ -926,7 +944,7 @@ export default function App() {
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
     try {
-      const result = await callGeminiAPI(prompt, activeArtifact);
+      const result = await callGeminiAPI(prompt, activeArtifact, sessionId);
       const aiMsg = { id: Date.now() + 1, role: 'assistant', text: result.text, artifact: null };
       setMessages(prev => [...prev, aiMsg]);
       if (window.innerWidth < 768) setIsCanvasOpen(false);
@@ -1118,12 +1136,12 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             
-            {/* Auto-Fix / Debug Button */}
+            {/* Auto-Fix / Debug Button (VISIBLE ON MOBILE NOW) */}
             <button 
               onClick={handleAutoFix}
               disabled={isTyping}
               title="Fix Bugs / Regenerate Code"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition mr-1"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition mr-1"
             >
               <Bug className="w-3.5 h-3.5" />
               Fix
