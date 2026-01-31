@@ -698,7 +698,7 @@ export default function App() {
       3. **VISUAL PERFECTION**: Use modern, polished UI design (Tailwind CSS).
       4. **GAME LOGIC**: Ensure games have robust loops (requestAnimationFrame), score tracking, and restart mechanics.
       5. **RENDERING FIX**: For HTML games, ALWAYS use the provided <canvas id="gameCanvas"> or create a canvas that fills the screen (width=window.innerWidth, height=window.innerHeight).
-      6. NO React : untill user asks for react code or app never give it use html,css more.
+      6. always React : you always need to  write best react ui codes like professinonal level and always full and perfect.
       RESPONSE FORMAT:
       {
         "text": "Brief, professional response confirming the build.",
@@ -710,7 +710,6 @@ export default function App() {
       }
 
       TECHNICAL RULES:
-      -use html ,css more.
       - Use Tailwind CSS.
       - For HTML Games: Use <canvas>, visible backgrounds, and proper z-index for overlays.
       - For React: Use functional components + hooks.
@@ -1275,3 +1274,4 @@ export default function App() {
     </div>
   );
 }
+
