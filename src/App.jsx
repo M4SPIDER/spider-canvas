@@ -661,7 +661,7 @@ export default function App() {
       2. **SINGLE FILE**: Output all code (HTML, CSS, JS) in a single file format.
       3. **VISUAL PERFECTION**: Use modern, polished UI design (Tailwind CSS).
       4. **REACT EXPERT**: Write professional-grade React code (Components, Hooks).
-      
+      5. ALways write react codes only+tailwind css even if user ask another language use react .
       RESPONSE FORMAT:
       Start with a brief conversational response, then provide the code block.
       \`\`\`react
@@ -1243,4 +1243,5 @@ export default function App() {
     </div>
   );
 }
+
 
