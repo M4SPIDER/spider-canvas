@@ -455,7 +455,7 @@ export default function App() {
             <div className="flex gap-3">
               <div className="px-4 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-400 flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                v9.9.99 Stable
+                v10.1.0 Stable
               </div>
             </div>
 
@@ -493,7 +493,7 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // File Upload State
-  const [attachedFile, setAttachedFile] = useState(null); // { name, type, content (base64/text) }
+  const [attachedFile, setAttachedFile] = useState(null); // { name, type, content (base64/text), preview }
   const fileInputRef = useRef(null);
 
   const [sidebarWidth, setSidebarWidth] = useState(400); 
@@ -651,30 +651,67 @@ export default function App() {
     }
   };
 
-  // --- File Handling ---
+  // --- File Handling with Resize & Clean Base64 ---
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target.result;
-      const isImage = file.type.startsWith('image/');
-      
-      setAttachedFile({
-        name: file.name,
-        type: isImage ? 'image' : 'text',
-        content: content // DataURL for image, String for text
-      });
-    };
-    
     if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_SIZE = 1024; // Fix 8001 by limiting dimensions
+
+                if (width > height) {
+                    if (width > MAX_SIZE) {
+                        height *= MAX_SIZE / width;
+                        width = MAX_SIZE;
+                    }
+                } else {
+                    if (height > MAX_SIZE) {
+                        width *= MAX_SIZE / height;
+                        height = MAX_SIZE;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Get clean data URL (jpeg usually smaller for photos)
+                const resizedDataUrl = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85);
+                
+                // Extract RAW BASE64 (strip data:image/...)
+                const rawBase64 = resizedDataUrl.split(',')[1];
+
+                setAttachedFile({
+                    name: file.name,
+                    type: 'image',
+                    content: rawBase64, // SEND THIS
+                    preview: resizedDataUrl // SHOW THIS
+                });
+            };
+            img.src = readerEvent.target.result;
+        };
         reader.readAsDataURL(file);
     } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setAttachedFile({
+                name: file.name,
+                type: 'text',
+                content: e.target.result,
+                preview: null
+            });
+        };
         reader.readAsText(file);
     }
     
-    // Reset input
     e.target.value = null;
   };
 
@@ -724,12 +761,16 @@ export default function App() {
         })
         .join('\n\n');
 
-    const finalPrompt = `${SYSTEM_INSTRUCTION}${context}\n\n[CHAT HISTORY]\n${recentHistory}\n\nUser Request: ${prompt}`;
+    // Optimization: Don't send huge history if deleting
+    const isDeleteMode = ["delete_all", "delete_memory"].includes(explicitMode);
+    const finalPrompt = isDeleteMode 
+       ? "DELETE_MEMORY" 
+       : `${SYSTEM_INSTRUCTION}${context}\n\n[CHAT HISTORY]\n${recentHistory}\n\nUser Request: ${prompt}`;
 
     // Payload Preparation
     const payload = {
       prompt: finalPrompt,
-      mode: explicitMode === "delete_all" ? "delete_all" : "stream", 
+      mode: isDeleteMode ? explicitMode : "stream", 
       stream: true, 
       session_id: sessionId
     };
@@ -737,7 +778,8 @@ export default function App() {
     // Attach File Data if present
     if (attachedFile) {
         if (attachedFile.type === 'image') {
-            payload.image = attachedFile.content; // base64 data url
+            // ALREADY RAW BASE64 from handleFileSelect
+            payload.image = attachedFile.content; 
         } else {
             payload.file_content = attachedFile.content; // text content
             payload.filename = attachedFile.name;
@@ -757,8 +799,8 @@ export default function App() {
 
       if (!response.ok) throw new Error(`API call failed: ${response.status}`);
 
-      // Handle Non-Streaming Responses (Delete All)
-      if (explicitMode === "delete_all") {
+      // Handle Non-Streaming Responses (Delete Memory / All)
+      if (isDeleteMode) {
         const data = await response.json();
         return { text: data.message, isStream: false };
       }
@@ -908,15 +950,58 @@ export default function App() {
     return clean.trim();
   };
 
+  // --- STRICT RESET SESSION LOGIC ---
+  const handleResetSession = async () => {
+    if (isTyping || isStreaming) return;
+    if (!window.confirm("Start a new session? This will clear all chat history.")) return;
+
+    setIsTyping(true);
+    
+    // 1. Unconditionally Reset UI First (Optimistic UI)
+    setMessages([{ 
+      id: Date.now(), 
+      role: 'assistant', 
+      text: "Session Reset. 🕷️\n\nMemory cleared. Ready for a new task.", 
+      artifact: defaultArtifact 
+    }]);
+    setActiveArtifact(defaultArtifact);
+    setAttachedFile(null);
+    setInput("");
+
+    try {
+      // 2. Clear Local Storage & Rotate ID
+      await clearDB();
+      const newSid = crypto.randomUUID();
+      setSessionId(newSid);
+      await saveToDB('spider_session_id', newSid);
+
+      // 3. Notify Backend (Fire & Forget/Best Effort)
+      await generateStream("delete_memory", "delete_memory");
+    } catch (e) {
+      console.error("Reset warning (Backend might be offline, but local session is reset):", e);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
   const handleSend = async () => {
     if ((!input.trim() && !attachedFile) || isTyping || isStreaming) return;
     
-    const userText = input;
+    let userText = input;
+    
+    // Auto-inject prompt if sending image without text
+    if (!userText.trim() && attachedFile) {
+         userText = attachedFile.type === 'image' ? "Analyze this image." : "Analyze this file.";
+    }
+
     const cleanPrompt = userText.trim().toLowerCase();
     
-    // --- SPECIAL COMMAND: DELETE ALL (CLIENT-SIDE INTERCEPTION REMOVED) ---
-    // User requested removal of local chat clearing logic.
-    // "delete all" will now pass through to the AI as a normal message.
+    // --- SPECIAL COMMAND: DELETE ALL ---
+    if (cleanPrompt === "delete all") {
+      setInput("");
+      handleResetSession(); // Re-use the strict reset logic
+      return;
+    }
 
     // --- STANDARD CHAT FLOW ---
     // Show attached file in chat
@@ -1030,6 +1115,16 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* New Session Button */}
+            <button 
+              onClick={handleResetSession}
+              disabled={isTyping || isStreaming}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+              title="New Session (Clear Memory)"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+
             {isDataLoaded && (
               <span className="hidden sm:flex text-[10px] text-slate-400 items-center gap-1 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
                 <Database className="w-3 h-3" />
@@ -1059,7 +1154,7 @@ export default function App() {
               <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300`}>
                 <div className={`max-w-[90%] md:max-w-[85%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed relative ${
                   msg.role === 'user' 
-                  ? 'bg-slate-900 text-white rounded-tr-none' 
+                  ? 'bg-indigo-600 text-white rounded-tr-none' 
                   : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
                 }`}>
                   {/* CHANGED: Use getDisplayText to hide code blocks */}
@@ -1103,7 +1198,7 @@ export default function App() {
             <div className="absolute bottom-full left-4 mb-2 flex items-center gap-2 p-2 bg-slate-100 border border-slate-200 rounded-lg shadow-sm animate-in slide-in-from-bottom-2">
                 {attachedFile.type === 'image' ? (
                     <div className="w-10 h-10 rounded overflow-hidden bg-slate-200">
-                        <img src={attachedFile.content} alt="preview" className="w-full h-full object-cover" />
+                        <img src={attachedFile.preview} alt="preview" className="w-full h-full object-cover" />
                     </div>
                 ) : (
                     <div className="w-10 h-10 rounded flex items-center justify-center bg-slate-200 text-slate-500">
@@ -1120,7 +1215,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="relative flex items-end gap-2 bg-slate-100 rounded-3xl p-2 border border-transparent focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100 transition duration-300 shadow-inner">
+          <div className="relative flex items-end gap-2 bg-slate-100 rounded-3xl p-2 border border-transparent transition duration-300 shadow-inner">
             
             {/* File Upload Button */}
             <input 
