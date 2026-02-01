@@ -4,7 +4,7 @@ import {
   Sparkles, FileCode, Share2, Copy, Check, PanelRightClose, PanelRightOpen, 
   Smartphone, Tablet, Monitor, ArrowLeft, Menu, X, Loader2, GripVertical, 
   Database, Trash2, Play, RotateCcw, FastForward, Bug, Edit3, StopCircle,
-  Cpu, Terminal, Zap, Globe
+  Cpu, Terminal, Zap, Globe, Paperclip, Image as ImageIcon, XCircle
 } from 'lucide-react';
 
 // --- Constants ---
@@ -455,7 +455,7 @@ export default function App() {
             <div className="flex gap-3">
               <div className="px-4 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-400 flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                v9.9.80 Stable
+                v9.9.99 Stable
               </div>
             </div>
 
@@ -476,7 +476,7 @@ export default function App() {
     { 
       id: 1, 
       role: 'assistant', 
-      text: "System Online. 🕷️\n\nI am the Ultimate Game Designer. I now support **Real-Time Streaming** and **Full Code Generation**.\n\nTry:\n- \"Create a YouTube UI clone\"\n- \"Build a 3D space shooter\"\n- \"Make a complex dashboard\"",
+      text: "System Online. 🕷️\n\nI am the Ultimate Game Designer. I now support **Vision**, **File Analysis**, and **Real-Time Streaming**.\n\nTry:\n- \"Analyze this code file\"\n- \"What is in this image?\"\n- \"Create a dashboard\"",
       artifact: defaultArtifact
     }
   ]);
@@ -491,7 +491,11 @@ export default function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-    
+  
+  // File Upload State
+  const [attachedFile, setAttachedFile] = useState(null); // { name, type, content (base64/text) }
+  const fileInputRef = useRef(null);
+
   const [sidebarWidth, setSidebarWidth] = useState(400); 
   const [isDragging, setIsDragging] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -647,6 +651,37 @@ export default function App() {
     }
   };
 
+  // --- File Handling ---
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      const isImage = file.type.startsWith('image/');
+      
+      setAttachedFile({
+        name: file.name,
+        type: isImage ? 'image' : 'text',
+        content: content // DataURL for image, String for text
+      });
+    };
+    
+    if (file.type.startsWith('image/')) {
+        reader.readAsDataURL(file);
+    } else {
+        reader.readAsText(file);
+    }
+    
+    // Reset input
+    e.target.value = null;
+  };
+
+  const clearAttachment = () => {
+    setAttachedFile(null);
+  };
+
   // --- API Handlers (Streaming) ---
 
   const generateStream = async (prompt, explicitMode = "chat") => {
@@ -661,7 +696,7 @@ export default function App() {
       2. **SINGLE FILE**: Output all code (HTML, CSS, JS) in a single file format.
       3. **VISUAL PERFECTION**: Use modern, polished UI design (Tailwind CSS).
       4. **REACT EXPERT**: Write professional-grade React code (Components, Hooks).
-      5. ALways write react codes only+tailwind css even if user ask another language use react no html .
+      
       RESPONSE FORMAT:
       Start with a brief conversational response, then provide the code block.
       \`\`\`react
@@ -675,7 +710,39 @@ export default function App() {
       context = `\n\n[CURRENT CODE CONTEXT]:\n${activeArtifact.code.substring(0, 10000)}\n\n[INSTRUCTION]: If editing, provide the FULL new code. Do not return diffs.`;
     }
 
-    const finalPrompt = `${SYSTEM_INSTRUCTION}${context}\n\nUser Request: ${prompt}`;
+    // Build History (Last 4 turns)
+    const recentHistory = messages
+        .filter(m => m.id !== 'streaming' && m.role !== 'system')
+        .slice(-4) 
+        .map(m => {
+          let text = m.text;
+          // CRITICAL FIX: Strip heavy code blocks from history to prevent token overflow
+          if (m.role === 'assistant') {
+            text = text.replace(/```[\s\S]*?```/g, '(Code Omitted for Context)');
+          }
+          return `${m.role.toUpperCase()}: ${text}`;
+        })
+        .join('\n\n');
+
+    const finalPrompt = `${SYSTEM_INSTRUCTION}${context}\n\n[CHAT HISTORY]\n${recentHistory}\n\nUser Request: ${prompt}`;
+
+    // Payload Preparation
+    const payload = {
+      prompt: finalPrompt,
+      mode: explicitMode === "delete_all" ? "delete_all" : "stream", 
+      stream: true, 
+      session_id: sessionId
+    };
+
+    // Attach File Data if present
+    if (attachedFile) {
+        if (attachedFile.type === 'image') {
+            payload.image = attachedFile.content; // base64 data url
+        } else {
+            payload.file_content = attachedFile.content; // text content
+            payload.filename = attachedFile.name;
+        }
+    }
 
     try {
       const response = await fetch(API_URL, {
@@ -684,12 +751,7 @@ export default function App() {
           "Content-Type": "application/json",
           "X-API-Key": API_KEY 
         },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          mode: explicitMode === "delete_all" ? "delete_all" : "stream", // Use 'stream' mode for chat
-          stream: true, // Explicitly enable streaming
-          session_id: sessionId
-        }),
+        body: JSON.stringify(payload),
         signal: abortControllerRef.current.signal
       });
 
@@ -741,12 +803,11 @@ export default function App() {
                 
                 // --- Real-time Code Extraction Logic ---
                 // We parse the full text to detect code blocks
-                // This is a simplified state machine for streaming
                 
                 const codeBlockStart = fullText.lastIndexOf('```');
                 
                 if (codeBlockStart !== -1) {
-                  // Check if we have a closing block after the start (rare in partial stream but possible)
+                  // Check if we have a closing block after the start
                   const codeBlockEnd = fullText.indexOf('```', codeBlockStart + 3);
                   
                   // Extract language
@@ -806,6 +867,7 @@ export default function App() {
       throw error;
     } finally {
       setIsStreaming(false);
+      setAttachedFile(null); // Clear file after sending
       abortControllerRef.current = null;
     }
   };
@@ -837,7 +899,6 @@ export default function App() {
     return null;
   };
 
-  // --- CHANGED: Helper to filter code blocks from chat text ---
   const getDisplayText = (text, role) => {
     if (role !== 'assistant') return text;
     // 1. Remove complete code blocks
@@ -848,52 +909,23 @@ export default function App() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isTyping || isStreaming) return;
+    if ((!input.trim() && !attachedFile) || isTyping || isStreaming) return;
     
     const userText = input;
     const cleanPrompt = userText.trim().toLowerCase();
     
-    // --- SPECIAL COMMAND: DELETE ALL ---
-    if (cleanPrompt === "delete all") {
-      setInput("");
-      setIsTyping(true);
-      
-      try {
-        // 1. Send Command to Backend FIRST to clear KV
-        await generateStream("delete all", "delete_all");
-
-        // 2. Only if successful, Clear Local State
-        setMessages([{ 
-          id: Date.now(), 
-          role: 'assistant', 
-          text: "Memory wiped successfully 🧠💨", 
-          artifact: null 
-        }]);
-        setActiveArtifact(null);
-        await clearDB();
-        
-        // 3. Generate NEW Session ID
-        const newSid = crypto.randomUUID();
-        setSessionId(newSid);
-        await saveToDB('spider_session_id', newSid);
-        
-        console.log("KV and Local Memory cleared.");
-      } catch (e) { 
-        console.error("Sync error:", e); 
-        setMessages(prev => [...prev, {
-            id: Date.now(),
-            role: 'assistant',
-            text: "Error clearing backend memory. Please try again.",
-            artifact: null
-        }]);
-      } finally {
-        setIsTyping(false);
-      }
-      return;
-    }
+    // --- SPECIAL COMMAND: DELETE ALL (CLIENT-SIDE INTERCEPTION REMOVED) ---
+    // User requested removal of local chat clearing logic.
+    // "delete all" will now pass through to the AI as a normal message.
 
     // --- STANDARD CHAT FLOW ---
-    const newUserMsg = { id: Date.now(), role: 'user', text: userText };
+    // Show attached file in chat
+    let displayText = userText;
+    if (attachedFile) {
+        displayText += `\n[Attached ${attachedFile.type === 'image' ? 'Image' : 'File'}: ${attachedFile.name}]`;
+    }
+
+    const newUserMsg = { id: Date.now(), role: 'user', text: displayText };
     setMessages(prev => [...prev, newUserMsg]);
     setInput("");
     setIsTyping(true);
@@ -1065,15 +1097,56 @@ export default function App() {
 
         {/* Input Area */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur border-t border-slate-100">
+            
+          {/* File Attachment Preview */}
+          {attachedFile && (
+            <div className="absolute bottom-full left-4 mb-2 flex items-center gap-2 p-2 bg-slate-100 border border-slate-200 rounded-lg shadow-sm animate-in slide-in-from-bottom-2">
+                {attachedFile.type === 'image' ? (
+                    <div className="w-10 h-10 rounded overflow-hidden bg-slate-200">
+                        <img src={attachedFile.content} alt="preview" className="w-full h-full object-cover" />
+                    </div>
+                ) : (
+                    <div className="w-10 h-10 rounded flex items-center justify-center bg-slate-200 text-slate-500">
+                        <FileCode className="w-5 h-5" />
+                    </div>
+                )}
+                <div className="flex-1 min-w-0 max-w-[200px]">
+                    <p className="text-xs font-semibold truncate text-slate-700">{attachedFile.name}</p>
+                    <p className="text-[10px] text-slate-400 uppercase">{attachedFile.type}</p>
+                </div>
+                <button onClick={clearAttachment} className="p-1 hover:bg-red-100 hover:text-red-500 rounded-full transition">
+                    <XCircle className="w-4 h-4" />
+                </button>
+            </div>
+          )}
+
           <div className="relative flex items-end gap-2 bg-slate-100 rounded-3xl p-2 border border-transparent focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100 transition duration-300 shadow-inner">
+            
+            {/* File Upload Button */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                onChange={handleFileSelect} 
+                accept="image/*,.txt,.js,.jsx,.ts,.tsx,.css,.html,.json,.md,.py"
+            />
+            <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isStreaming}
+                className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-slate-200 rounded-full transition mb-[1px]"
+                title="Attach Image or Code"
+            >
+                <Paperclip className="w-4 h-4" />
+            </button>
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-              placeholder="Ask Spider to build something..."
+              placeholder={attachedFile ? "Ask about this file..." : "Ask Spider to build something..."}
               rows={1}
               disabled={isStreaming}
-              className="w-full pl-4 py-3 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400 resize-none max-h-32 disabled:opacity-50"
+              className="w-full py-3 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400 resize-none max-h-32 disabled:opacity-50"
               style={{ minHeight: '44px' }} 
             />
             
@@ -1088,7 +1161,7 @@ export default function App() {
             ) : (
               <button 
                 onClick={handleSend}
-                disabled={!input.trim() || isTyping}
+                disabled={(!input.trim() && !attachedFile) || isTyping}
                 className="p-3 bg-slate-900 text-white rounded-full hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md flex-shrink-0 mb-[1px] group"
               >
                 {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />}
@@ -1243,6 +1316,3 @@ export default function App() {
     </div>
   );
 }
-
-
-
