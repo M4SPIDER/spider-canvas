@@ -7,12 +7,12 @@ import {
   Cpu, Terminal, Zap, Globe, Paperclip, Image as ImageIcon, XCircle
 } from 'lucide-react';
 
+
 // --- Constants ---
 const DB_NAME = 'SpiderCanvasDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'session';
-const API_URL = "https://aistudio.m4spider.com/v1/chat";
-const API_KEY = "sk-spider-114f1baf90a23a4e346596d29df7d6b71365577a768d2c2cacc5f15b0497f018";
+
 
 // --- IndexedDB Helpers ---
 const initDB = () => {
@@ -26,10 +26,12 @@ const initDB = () => {
       }
     };
 
+
     request.onsuccess = (event) => resolve(event.target.result);
     request.onerror = (event) => reject(event.target.error);
   });
 };
+
 
 const saveToDB = async (key, value) => {
   try {
@@ -42,6 +44,7 @@ const saveToDB = async (key, value) => {
     console.error('Error saving to DB:', error);
   }
 };
+
 
 const loadFromDB = async (key) => {
   try {
@@ -60,6 +63,7 @@ const loadFromDB = async (key) => {
   }
 };
 
+
 const clearDB = async () => {
   try {
     const db = await initDB();
@@ -72,7 +76,9 @@ const clearDB = async () => {
   }
 };
 
+
 // --- Custom Components ---
+
 
 // THE REAL SPIDER LOGO (Geometric Processor Core)
 const SpiderLogo = ({ className }) => (
@@ -99,7 +105,9 @@ const SpiderLogo = ({ className }) => (
   </svg>
 );
 
+
 // --- Components ---
+
 
 /**
  * Responsive Artifact Preview
@@ -107,16 +115,42 @@ const SpiderLogo = ({ className }) => (
  */
 const ArtifactPreview = ({ content, type, deviceMode }) => {
   const iframeRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Prevent parent scroll when hovering preview - allows iframe wheel events to work
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e) => e.preventDefault();
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
 
   useEffect(() => {
     if (!iframeRef.current) return;
 
+
     let blobContent = '';
     const rawContent = content || '';
 
+
+    // --- SMART TYPE DETECTION ---
+    // Force HTML mode if the content starts with typical HTML doctypes/tags, 
+    // overriding the 'type' prop which might be stale (e.g., 'react')
+    let renderType = type;
+    const trimmed = rawContent.trim();
+    if (trimmed.startsWith('<!DOCTYPE html>') || trimmed.startsWith('<html')) {
+      renderType = 'html';
+    }
+
+
     // --- Template for React Components ---
-    if (type === 'react') {
-      const encodedCode = JSON.stringify(rawContent);
+    if (renderType === 'react') {
+      // CRITICAL FIX: Escape closing script tags to prevent self-breaking when previewing this file itself
+      const processed = rawContent.replace(/import\.meta/g, 'window.__importMeta__');
+      const encodedCode = JSON.stringify(processed).replace(/<\/script/g, '<\\/script');
+
 
       blobContent = `
 <!DOCTYPE html>
@@ -134,9 +168,21 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
     
     <!-- 3. Icon Library (Vanilla Lucide UMD) -->
     <script src="https://unpkg.com/lucide@0.292.0/dist/umd/lucide.min.js"></script>
+
+
+    <!-- 4. 3D Engine Support (FIXED: Added Three.js & Fiber) -->
+    <script crossorigin src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@react-three/fiber@8.15.12/dist/react-three-fiber.min.js"></script>
     
-    <!-- 4. Compiler -->
+    <!-- 5. Firebase Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+    
+    <!-- 6. Compiler -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
 
     <style>
       /* FORCE WHITE BACKGROUND FOR REACT APPS */
@@ -173,6 +219,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
     </div>
     <div id="root"></div>
 
+
     <script>
       // 1. Error Handler
       window.onerror = function(msg, url, line, col, error) {
@@ -182,6 +229,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
         errDiv.innerHTML = '<strong>Runtime Error:</strong><br/>' + msg + '<br/><small>' + (line ? 'Line: ' + line : '') + '</small>';
         return false;
       };
+
 
       // 2. Lucide Icons Setup
       // We process the vanilla icons into a map for fast React lookup
@@ -206,6 +254,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
         }
       }
 
+
       // 3. Lucide Proxy (The Connector)
       const LucideIconProxy = new Proxy({}, {
         get: (target, prop) => {
@@ -224,6 +273,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
                 if(match) iconDef = window.lucide.icons[match];
             }
 
+
             // Render Icon
             if (iconDef && Array.isArray(iconDef)) {
                 const [tag, attrs, children] = iconDef;
@@ -231,6 +281,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
                 // Helper to recurse children - SAFE VERSION
                 const renderChildren = (childList) => {
                     if (!Array.isArray(childList)) return [];
+
 
                     return childList.map((child, i) => {
                         if (!Array.isArray(child)) return null;
@@ -240,6 +291,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
                         );
                     });
                 };
+
 
                 return React.createElement('svg', {
                     xmlns: "http://www.w3.org/2000/svg",
@@ -257,6 +309,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
                 }, renderChildren(children || []));
             }
 
+
             // Fallback if not found
             return React.createElement('span', { 
                style: { display: 'inline-block', width: 24, height: 24, border: '1px dashed #ef4444', borderRadius: 4, ...props.style },
@@ -266,18 +319,77 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
         }
       });
 
-      // 4. Module Shim
+
+      // 4. Module Shim (FIXED: Added Three and Fiber mappings)
       window.require = (moduleName) => {
         if (moduleName === 'react') return window.React;
-        if (moduleName === 'react-dom') return window.ReactDOM;
+        if (moduleName === 'react-dom' || moduleName === 'react-dom/client') return window.ReactDOM;
         if (moduleName === 'lucide-react') return LucideIconProxy;
         if (moduleName === 'recharts') return window.Recharts || {}; 
+        
+        // --- 3D Support ---
+        if (moduleName === 'three') return window.THREE;
+        if (moduleName === '@react-three/fiber') return window.ReactThreeFiber;
+        
+        // --- Firebase Modular-to-Compat Wrappers ---
+        if (moduleName === 'firebase/app') {
+          const fb = window.firebase;
+          return fb ? { initializeApp: (c) => fb.initializeApp(c), getApp: (n) => fb.app(n), deleteApp: (a) => a.delete(), getApps: () => fb.apps, registerVersion: () => {} } : {};
+        }
+        if (moduleName === 'firebase/auth') {
+          const fb = window.firebase;
+          return fb ? {
+            getAuth: (app) => (app || fb).auth ? (app || fb).auth() : fb.auth(),
+            signInWithEmailAndPassword: (a, e, p) => a.signInWithEmailAndPassword(e, p),
+            createUserWithEmailAndPassword: (a, e, p) => a.createUserWithEmailAndPassword(e, p),
+            signOut: (a) => a.signOut(),
+            onAuthStateChanged: (a, c) => a.onAuthStateChanged(c),
+            sendPasswordResetEmail: (a, e) => a.sendPasswordResetEmail(e),
+            updateProfile: (u, p) => u.updateProfile(p),
+            signInWithPopup: (a, p) => a.signInWithPopup(p),
+            GoogleAuthProvider: class { constructor() { this.providerId = 'google.com'; } },
+          } : {};
+        }
+        if (moduleName === 'firebase/firestore') {
+          const fb = window.firebase;
+          return fb ? {
+            getFirestore: (app) => fb.firestore(app),
+            collection: (db, path) => db.collection(path),
+            doc: (db, path) => db.doc ? db.doc(path) : db.collection(path.split('/').slice(0,-1).join('/')).doc(path.split('/').pop()),
+            addDoc: (ref, data) => ref.add(data),
+            setDoc: (ref, data) => ref.set(data),
+            updateDoc: (ref, data) => ref.update(data),
+            deleteDoc: (ref) => ref.delete(),
+            getDoc: (ref) => ref.get(),
+            getDocs: (ref) => ref.get(),
+            onSnapshot: (ref, cb) => ref.onSnapshot(cb),
+            query: (ref, ...conds) => ref.where ? conds.reduce((q, c) => q.where(c.field, c.op, c.value), ref) : ref,
+            where: (field, op, val) => ({ field, op, value: val }),
+            orderBy: () => {},
+            limit: () => {},
+            Timestamp: { now: () => fb.firestore.Timestamp.now(), fromDate: (d) => fb.firestore.Timestamp.fromDate(d), toDate: (t) => t.toDate() },
+            serverTimestamp: () => fb.firestore.FieldValue.serverTimestamp(),
+          } : {};
+        }
+        if (moduleName === 'firebase/storage') {
+          const fb = window.firebase;
+          return fb ? {
+            getStorage: (app) => fb.storage(app),
+            ref: (st, path) => st.ref(path),
+            uploadBytes: (ref, file) => ref.put(file),
+            getDownloadURL: (ref) => ref.getDownloadURL(),
+            deleteObject: (ref) => ref.delete(),
+          } : {};
+        }
+        
         return {}; 
       };
       
       window.process = { env: { NODE_ENV: 'production' } };
+      window.__importMeta__ = { url: '', env: {} };
       window.exports = {};
       window.module = { exports: window.exports };
+
 
       // 5. Execution Logic
       async function run() {
@@ -294,6 +406,7 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
           } else {
              initIcons(); // Build the index
           }
+
 
           if (!window.React || !window.ReactDOM) throw new Error("React failed to load");
           
@@ -313,14 +426,17 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
             }
           \`;
 
+
           const compiled = Babel.transform(fullCode, { 
-            presets: ['react', ['env', { modules: 'commonjs' }]],
+            presets: [['react', { runtime: 'classic' }], ['env', { modules: 'commonjs' }]],
             filename: 'app.js'
           }).code;
+
 
           new Function('require', 'React', 'ReactDOM', 'module', 'exports', compiled)(
             window.require, window.React, window.ReactDOM, window.module, window.exports
           );
+
 
           // Remove loader
           const loader = document.getElementById('loader');
@@ -329,10 +445,12 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
              setTimeout(() => loader.remove(), 500);
           }
 
+
         } catch (e) {
           window.onerror(e.message, '', '', '', e);
         }
       }
+
 
       run();
     </script>
@@ -340,32 +458,42 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
 </html>`;
     } 
     // --- HTML Fallback ---
-    else if (type === 'html') {
-      const safeHtmlContent = rawContent;
-      blobContent = `
+    else if (renderType === 'html') {
+      // Check if it's a full HTML document (Smart check)
+      if (rawContent.includes('<!DOCTYPE html>') || rawContent.includes('<html')) {
+          blobContent = rawContent;
+      } else {
+          // It's a fragment, wrap it
+          const safeHtmlContent = rawContent;
+          blobContent = `
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <style>html,body{margin:0;height:100%;background:#000;color:white;}</style>
   </head>
   <body>
     ${safeHtmlContent}
   </body>
 </html>`;
+      }
     } else {
       const safeFallbackContent = rawContent.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       blobContent = `<html><body style="margin:0;padding:1rem;background:#fff;"><pre style="font-family:monospace;">` + safeFallbackContent + `</pre></body></html>`;
     }
 
+
     const blob = new Blob([blobContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     iframeRef.current.src = url;
 
+
     return () => URL.revokeObjectURL(url);
   }, [content, type]);
+
 
   const getContainerStyle = () => {
     switch (deviceMode) {
@@ -375,20 +503,24 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
     }
   };
 
+
   return (
     <div className={`w-full h-full flex items-center justify-center bg-slate-100 transition-all duration-300 ${deviceMode !== 'desktop' ? 'p-4 md:p-8' : ''}`}>
-      <div style={getContainerStyle()} className="relative overflow-hidden transition-all duration-500 ease-in-out origin-center bg-white">
+      <div ref={containerRef} style={getContainerStyle()} className="relative overflow-hidden transition-all duration-500 ease-in-out origin-center bg-white" onClick={() => iframeRef.current?.focus()}>
         <iframe 
           ref={iframeRef} 
           title="Artifact Preview"
           className="w-full h-full border-none bg-white block"
-          sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin allow-pointer-lock allow-presentation"
-          allow="accelerometer; autoplay; camera; encrypted-media; geolocation; gyroscope; microphone; midi; clipboard-read; clipboard-write; web-share; picture-in-picture; fullscreen"
+          sandbox="allow-scripts allow-modals allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-pointer-lock allow-presentation allow-downloads"
+          allow="accelerometer; autoplay; camera; encrypted-media; geolocation; gyroscope; microphone; midi; clipboard-read; clipboard-write; web-share; picture-in-picture; fullscreen; keyboard"
+          style={{ touchAction: 'none' }}
+          tabIndex={0}
         />
       </div>
     </div>
   );
 };
+
 
 export default function App() {
   
@@ -398,6 +530,7 @@ export default function App() {
     language: "react",
     code: `import React from 'react';
 import { Sparkles, Terminal, Cpu, Zap, Radio } from 'lucide-react';
+
 
 export default function App() {
   return (
@@ -409,6 +542,7 @@ export default function App() {
         backgroundImage: 'linear-gradient(rgba(56, 189, 248, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(56, 189, 248, 0.1) 1px, transparent 1px)', 
         backgroundSize: '40px 40px' 
       }}></div>
+
 
       {/* Main Container */}
       <div className="relative z-10 max-w-3xl w-full mx-4">
@@ -428,6 +562,7 @@ export default function App() {
               </div>
             </div>
 
+
             <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6 tracking-tight">
               Spider Canvas
             </h1>
@@ -436,6 +571,7 @@ export default function App() {
               Advanced Stream Architecture.<br/>
               <span className="text-cyan-400 font-medium">Real-time.</span> <span className="text-blue-400 font-medium">Full Code.</span> <span className="text-indigo-400 font-medium">KV Memory.</span>
             </p>
+
 
             {/* Feature Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-8">
@@ -451,6 +587,7 @@ export default function App() {
               ))}
             </div>
 
+
             {/* Status Bar */}
             <div className="flex gap-3">
               <div className="px-4 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-400 flex items-center gap-2">
@@ -459,6 +596,7 @@ export default function App() {
               </div>
             </div>
 
+
           </div>
         </div>
         
@@ -466,20 +604,369 @@ export default function App() {
           PROCESSED BY SPIDER CORE
         </div>
 
+
       </div>
     </div>
   );
 }`
   };
 
+
+  // Example Artifacts - Your Powerful WebGL/Canvas Examples
+  const exampleArtifacts = {
+    grass: {
+      title: "🌿 TerraSim: Interactive Lawn Showcase",
+      language: "html",
+      code: null // Will be loaded dynamically
+    },
+    galaxy: {
+      title: "🌌 3D Galaxy Engine - WebGL",
+      language: "html",
+      // Loaded from examples/glaxy.html
+      code: null // Will be loaded dynamically
+    },
+    solar: {
+      title: "🪐 Solar System Simulator - Three.js",
+      language: "react",
+      // Loaded from examples/solar system.jsx
+      code: null // Will be loaded dynamically
+    },
+    chess: {
+      title: "♟️ Chess Arena Pro",
+      language: "react",
+      // Loaded from examples/chess.jsx
+      code: null // Will be loaded dynamically
+    },
+    calc: {
+      title: "🔬 Engineering Calculator",
+      language: "react",
+      // Loaded from examples/calc.jsx
+      code: null // Will be loaded dynamically
+    }
+  };
+
+  // Load example from file
+  const loadExample = async (exampleKey) => {
+    try {
+      const fileName = exampleKey === 'galaxy' ? 'glaxy.html' : 
+                       exampleKey === 'solar' ? 'solar system.jsx' : 
+                       exampleKey === 'grass' ? 'grass.html' : 
+                       exampleKey === 'chess' ? 'chess.jsx' :
+                       exampleKey === 'calc' ? 'calc.jsx' : exampleKey;
+      const response = await fetch(`/examples/${fileName}`);
+      if (response.ok) {
+        const code = await response.text();
+        setActiveArtifact({
+          ...exampleArtifacts[exampleKey],
+          code: code
+        });
+        setIsCanvasOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to load example:', error);
+    }
+  };
+
+  // Calculator (keeping the simple one)
+  const exampleArtifactsSimple = {
+    calculator: {
+      title: "Spider Calculator",
+      code: `import React, { useState } from 'react';
+import { Calculator } from 'lucide-react';
+
+export default function App() {
+  const [display, setDisplay] = useState('0');
+  const [previousValue, setPreviousValue] = useState(null);
+  const [operation, setOperation] = useState(null);
+  const [resetDisplay, setResetDisplay] = useState(false);
+
+  const handleNumber = (num) => {
+    if (resetDisplay) {
+      setDisplay(num);
+      setResetDisplay(false);
+    } else {
+      setDisplay(display === '0' ? num : display + num);
+    }
+  };
+
+  const handleOperation = (op) => {
+    setPreviousValue(parseFloat(display));
+    setOperation(op);
+    setResetDisplay(true);
+  };
+
+  const handleEquals = () => {
+    if (!operation || previousValue === null) return;
+    const current = parseFloat(display);
+    let result;
+    switch (operation) {
+      case '+': result = previousValue + current; break;
+      case '-': result = previousValue - current; break;
+      case '*': result = previousValue * current; break;
+      case '/': result = current !== 0 ? previousValue / current : 'Error'; break;
+      default: return;
+    }
+    setDisplay(String(result));
+    setOperation(null);
+    setPreviousValue(null);
+    setResetDisplay(true);
+  };
+
+  const handleClear = () => {
+    setDisplay('0');
+    setPreviousValue(null);
+    setOperation(null);
+    setResetDisplay(false);
+  };
+
+  const handleDelete = () => {
+    setDisplay(display.length > 1 ? display.slice(0, -1) : '0');
+  };
+
+  const buttons = [
+    { label: 'C', type: 'function', action: handleClear },
+    { label: '%', type: 'function', action: () => setDisplay(String(parseFloat(display) / 100)) },
+    { label: '⌫', type: 'function', action: handleDelete },
+    { label: '÷', type: 'operator', action: () => handleOperation('/') },
+    { label: '7', type: 'number', action: () => handleNumber('7') },
+    { label: '8', type: 'number', action: () => handleNumber('8') },
+    { label: '9', type: 'number', action: () => handleNumber('9') },
+    { label: '×', type: 'operator', action: () => handleOperation('*') },
+    { label: '4', type: 'number', action: () => handleNumber('4') },
+    { label: '5', type: 'number', action: () => handleNumber('5') },
+    { label: '6', type: 'number', action: () => handleNumber('6') },
+    { label: '−', type: 'operator', action: () => handleOperation('-') },
+    { label: '1', type: 'number', action: () => handleNumber('1') },
+    { label: '2', type: 'number', action: () => handleNumber('2') },
+    { label: '3', type: 'number', action: () => handleNumber('3') },
+    { label: '+', type: 'operator', action: () => handleOperation('+') },
+    { label: '0', type: 'number', action: () => handleNumber('0'), wide: true },
+    { label: '.', type: 'number', action: () => { if (!display.includes('.')) setDisplay(display + '.'); } },
+    { label: '=', type: 'equals', action: handleEquals },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/30">
+            <Calculator className="w-6 h-6 text-purple-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Spider Calculator</h1>
+            <p className="text-xs text-purple-300/60">Mobile Optimized</p>
+          </div>
+        </div>
+        <div className="bg-slate-800/50 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-2xl">
+          <div className="bg-slate-900/50 rounded-2xl p-6 mb-6 border border-slate-700/30">
+            <div className="text-right">
+              <div className="text-sm text-slate-400 h-6 font-mono">{previousValue !== null && \`\${previousValue} \${operation}\`}</div>
+              <div className="text-4xl font-bold text-white font-mono truncate">{display}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {buttons.map((btn, i) => (
+              <button key={i} onClick={btn.action} className={\`h-16 rounded-2xl font-semibold text-lg transition-all duration-150 active:scale-95 \${btn.wide ? 'col-span-2' : ''} \${btn.type === 'number' ? 'bg-slate-700/50 hover:bg-slate-600/50 text-white border border-slate-600/30' : ''} \${btn.type === 'operator' ? 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30' : ''} \${btn.type === 'equals' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white shadow-lg shadow-purple-500/25' : ''} \${btn.type === 'function' ? 'bg-slate-600/30 hover:bg-slate-500/30 text-slate-300 border border-slate-600/30' : ''}\`}>
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-center text-xs text-purple-300/40 mt-6">Made with 🕷️ Spider Canvas</p>
+      </div>
+    </div>
+  );
+}`
+    },
+    weather: {
+      title: "Spider Weather",
+      language: "react",
+      code: `import React, { useState } from 'react';
+import { Cloud, Sun, CloudRain, CloudSnow, Wind, Droplets, Eye, Thermometer } from 'lucide-react';
+
+export default function App() {
+  const [selectedDay, setSelectedDay] = useState(0);
+  const weatherData = [
+    { day: 'Today', icon: Sun, temp: 28, high: 32, low: 22, condition: 'Sunny', humidity: 45, wind: 12, uv: 8 },
+    { day: 'Tue', icon: Cloud, temp: 25, high: 28, low: 20, condition: 'Cloudy', humidity: 60, wind: 18, uv: 4 },
+    { day: 'Wed', icon: CloudRain, temp: 22, high: 24, low: 18, condition: 'Rainy', humidity: 85, wind: 25, uv: 2 },
+    { day: 'Thu', icon: CloudSnow, temp: 18, high: 20, low: 12, condition: 'Snow', humidity: 70, wind: 15, uv: 1 },
+    { day: 'Fri', icon: Sun, temp: 30, high: 34, low: 24, condition: 'Sunny', humidity: 40, wind: 8, uv: 9 },
+    { day: 'Sat', icon: Cloud, temp: 26, high: 29, low: 21, condition: 'Cloudy', humidity: 55, wind: 14, uv: 5 },
+    { day: 'Sun', icon: Sun, temp: 29, high: 33, low: 23, condition: 'Sunny', humidity: 42, wind: 10, uv: 7 },
+  ];
+  const current = weatherData[selectedDay];
+  const IconComponent = current.icon;
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-cyan-800 to-blue-900 p-4">
+      <div className="max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-white">Spider Weather</h1>
+            <p className="text-sm text-blue-200/60">M4 Spider Canvas</p>
+          </div>
+        </div>
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 mb-4 border border-white/20 shadow-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-200/80 text-sm font-medium">{current.day}</p>
+              <div className="text-6xl font-bold text-white mt-1">{current.temp}°</div>
+              <p className="text-blue-200 mt-2">{current.condition}</p>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-0 bg-yellow-400/20 blur-3xl rounded-full"></div>
+              <IconComponent className="w-24 h-24 text-yellow-300 relative z-10 drop-shadow-lg" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="text-red-400 font-semibold">↑ {current.high}°</span>
+              <span className="text-blue-300 font-semibold">↓ {current.low}°</span>
+            </div>
+            <div className="flex items-center gap-4 text-blue-200/80 text-sm">
+              <span className="flex items-center gap-1"><Droplets className="w-4 h-4" /> {current.humidity}%</span>
+              <span className="flex items-center gap-1"><Wind className="w-4 h-4" /> {current.wind}km/h</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-4 mb-4 border border-white/20">
+          <h3 className="text-sm font-semibold text-blue-200 mb-3">7-Day Forecast</h3>
+          <div className="space-y-2">
+            {weatherData.map((day, i) => {
+              const DayIcon = day.icon;
+              return (
+                <button key={i} onClick={() => setSelectedDay(i)} className={\`w-full flex items-center justify-between p-3 rounded-2xl transition-all \${selectedDay === i ? 'bg-white/20 border border-white/30' : 'hover:bg-white/5 border border-transparent'}\`}>
+                  <span className={\`w-12 text-left text-sm font-medium \${selectedDay === i ? 'text-white' : 'text-blue-200/80'}\`}>{day.day}</span>
+                  <DayIcon className={\`w-5 h-5 \${selectedDay === i ? 'text-yellow-300' : 'text-blue-300/60'}\`} />
+                  <div className="flex items-center gap-3">
+                    <span className={\`text-sm font-semibold \${selectedDay === i ? 'text-white' : 'text-blue-200/60'}\`}>{day.high}°</span>
+                    <span className="text-xs text-blue-300/40">{day.low}°</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <p className="text-center text-xs text-blue-200/40 mt-6">Powered by 🕷️ Spider Canvas</p>
+      </div>
+    </div>
+  );
+}`
+    },
+    todo: {
+      title: "Spider Tasks",
+      language: "react",
+      code: `import React, { useState } from 'react';
+import { Plus, Check, Trash2, Edit3, Clock, Star } from 'lucide-react';
+
+export default function App() {
+  const [tasks, setTasks] = useState([
+    { id: 1, text: 'Learn Spider Canvas', completed: true, priority: 'high', createdAt: new Date() },
+    { id: 2, text: 'Build mobile apps', completed: false, priority: 'medium', createdAt: new Date() },
+    { id: 3, text: 'Share with friends', completed: false, priority: 'low', createdAt: new Date() },
+  ]);
+  const [newTask, setNewTask] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [priority, setPriority] = useState('medium');
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const addTask = () => {
+    if (!newTask.trim()) return;
+    setTasks([...tasks, { id: Date.now(), text: newTask, completed: false, priority, createdAt: new Date() }]);
+    setNewTask('');
+  };
+  const toggleTask = (id) => setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const deleteTask = (id) => setTasks(tasks.filter(t => t.id !== id));
+  const startEdit = (task) => { setEditingId(task.id); setEditText(task.text); };
+  const saveEdit = (id) => { setTasks(tasks.map(t => t.id === id ? { ...t, text: editText } : t)); setEditingId(null); };
+  const filteredTasks = tasks.filter(t => {
+    if (filter === 'active') return !t.completed;
+    if (filter === 'completed') return t.completed;
+    return true;
+  });
+  const stats = { total: tasks.length, completed: tasks.filter(t => t.completed).length, active: tasks.filter(t => !t.completed).length };
+  const priorityColors = { high: 'bg-red-500/20 text-red-400 border-red-500/30', medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', low: 'bg-green-500/20 text-green-400 border-green-500/30' };
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-4">
+      <div className="max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-white">Spider Tasks</h1>
+            <p className="text-sm text-purple-200/60">{stats.active} tasks remaining</p>
+          </div>
+          <div className="px-3 py-1 bg-white/10 rounded-full text-xs text-white/80">{stats.completed}/{stats.total} done</div>
+        </div>
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 mb-4 border border-white/20">
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-center"><div className="text-2xl font-bold text-white">{stats.total}</div><div className="text-purple-200/60 text-xs">Total</div></div>
+            <div className="w-px h-8 bg-white/20"></div>
+            <div className="text-center"><div className="text-2xl font-bold text-green-400">{stats.completed}</div><div className="text-purple-200/60 text-xs">Done</div></div>
+            <div className="w-px h-8 bg-white/20"></div>
+            <div className="text-center"><div className="text-2xl font-bold text-yellow-400">{stats.active}</div><div className="text-purple-200/60 text-xs">Active</div></div>
+          </div>
+          <div className="mt-4 h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-500" style={{ width: \`\${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%\` }}></div>
+          </div>
+        </div>
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 mb-4 border border-white/20">
+          <div className="flex gap-2 mb-3">
+            <input type="text" value={newTask} onChange={(e) => setNewTask(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addTask()} placeholder="Add new task..." className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-purple-400" />
+            <button onClick={addTask} className="px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white font-semibold hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95"><Plus className="w-5 h-5" /></button>
+          </div>
+          <div className="flex gap-2">
+            {['low', 'medium', 'high'].map((p) => (
+              <button key={p} onClick={() => setPriority(p)} className={\`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border \${priority === p ? priorityColors[p] : 'bg-white/5 text-white/60 border-transparent hover:bg-white/10'}\`}>{p}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2 mb-4">
+          {['all', 'active', 'completed'].map((f) => (
+            <button key={f} onClick={() => setFilter(f)} className={\`flex-1 py-2 rounded-xl text-sm font-medium capitalize transition-all \${filter === f ? 'bg-white/20 text-white border border-white/30' : 'bg-white/5 text-white/60 border border-transparent hover:bg-white/10'}\`}>{f}</button>
+          ))}
+        </div>
+        <div className="space-y-3">
+          {filteredTasks.map((task) => (
+            <div key={task.id} className={\`bg-white/10 backdrop-blur-xl rounded-2xl p-4 border transition-all \${task.completed ? 'border-green-500/30 opacity-70' : 'border-white/20'}\`}>
+              <div className="flex items-center gap-3">
+                <button onClick={() => toggleTask(task.id)} className={\`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all \${task.completed ? 'bg-green-500 border-green-500' : 'border-white/40 hover:border-purple-400'}\`}>{task.completed && <Check className="w-4 h-4 text-white" />}</button>
+                <div className="flex-1">
+                  {editingId === task.id ? (
+                    <input type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && saveEdit(task.id)} onBlur={() => saveEdit(task.id)} className="w-full bg-white/10 border border-purple-400 rounded-lg px-3 py-1 text-white focus:outline-none" autoFocus />
+                  ) : (
+                    <p className={\`text-white font-medium \${task.completed ? 'line-through text-white/60' : ''}\`}>{task.text}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={\`text-[10px] px-2 py-0.5 rounded-full border \${priorityColors[task.priority]}\`}>{task.priority}</span>
+                    <span className="text-[10px] text-white/40 flex items-center gap-1"><Clock className="w-3 h-3" /> Just now</span>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => startEdit(task)} className="p-2 text-white/40 hover:text-purple-400 hover:bg-white/10 rounded-lg transition"><Edit3 className="w-4 h-4" /></button>
+                  <button onClick={() => deleteTask(task.id)} className="p-2 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-lg transition"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {filteredTasks.length === 0 && <div className="text-center py-12"><Star className="w-12 h-12 text-purple-400/40 mx-auto mb-3" /><p className="text-white/60">No tasks here!</p></div>}
+        <p className="text-center text-xs text-purple-200/40 mt-6">Built with 🕷️ Spider Canvas</p>
+      </div>
+    </div>
+  );
+}`
+    }
+  };
+
   const [messages, setMessages] = useState([
     { 
       id: 1, 
       role: 'assistant', 
-      text: "System Online. 🕷️\n\nI am the Ultimate Game Designer. I now support **Vision**, **File Analysis**, and **Real-Time Streaming**.\n\nTry:\n- \"Analyze this code file\"\n- \"What is in this image?\"\n- \"Create a dashboard\"",
-      artifact: defaultArtifact
+      text: "System Online. 🕷️\n\nI am the Ultimate Game Designer. I now support **WebGL**, **3D Rendering**, and **Real-Time Streaming**.\n\n🎮 **Power Demos Available:**\n- 🌿 TerraSim Grass (WebGL Shaders)\n- 🌌 3D Galaxy Engine (WebGL)\n- 🪐 Solar System Simulator\n- ♟️ Chess Arena Pro\n- 🔬 Engineering Calculator\n\nClick a demo below to see Spider Canvas in action!",
+      artifact: defaultArtifact,
+      examples: ['grass', 'galaxy', 'solar', 'chess', 'calc']
     }
   ]);
+
 
   const [input, setInput] = useState("");
   const [activeArtifact, setActiveArtifact] = useState(defaultArtifact);
@@ -496,6 +983,7 @@ export default function App() {
   const [attachedFile, setAttachedFile] = useState(null); // { name, type, content (base64/text), preview }
   const fileInputRef = useRef(null);
 
+
   const [sidebarWidth, setSidebarWidth] = useState(400); 
   const [isDragging, setIsDragging] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -504,19 +992,24 @@ export default function App() {
   const [sessionId, setSessionId] = useState("");
   const abortControllerRef = useRef(null);
 
+
   // Ref for Full Screen
   const canvasContainerRef = useRef(null);
   const messagesEndRef = useRef(null);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
 
+
   // --- Effects ---
+
 
   // Initialize Session ID
   useEffect(() => {
@@ -531,13 +1024,22 @@ export default function App() {
     initSession();
   }, []);
 
+
   useEffect(() => {
     const loadSession = async () => {
       const savedMessages = await loadFromDB('messages');
       const savedArtifact = await loadFromDB('activeArtifact');
       
+      // Check if saved messages have the new examples property with grass
       if (savedMessages && Array.isArray(savedMessages) && savedMessages.length > 0) {
-        setMessages(savedMessages);
+        // Force new default if old format or missing grass
+        const hasExamples = savedMessages[0] && savedMessages[0].examples && savedMessages[0].examples.includes('grass');
+        if (hasExamples) {
+          setMessages(savedMessages);
+        } else {
+          // Old format - use new default
+          await clearDB();
+        }
       }
       
       if (savedArtifact) {
@@ -548,17 +1050,20 @@ export default function App() {
     loadSession();
   }, []);
 
+
   useEffect(() => {
     if (isDataLoaded && messages.length > 0) { 
       saveToDB('messages', messages);
     }
   }, [messages, isDataLoaded]);
 
+
   useEffect(() => {
     if (isDataLoaded && activeArtifact) {
       saveToDB('activeArtifact', activeArtifact);
     }
   }, [activeArtifact, isDataLoaded]);
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -576,6 +1081,7 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isDragging) return;
@@ -584,16 +1090,19 @@ export default function App() {
       const minWidth = 250; 
       const maxAllowedWidth = window.innerWidth - 50; 
 
+
       if (newWidth >= minWidth && newWidth <= maxAllowedWidth) {
         setSidebarWidth(newWidth);
       }
     };
+
 
     const handleMouseUp = () => {
       setIsDragging(false);
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
     };
+
 
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
@@ -602,6 +1111,7 @@ export default function App() {
       document.body.style.userSelect = 'none';
     }
 
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -609,6 +1119,7 @@ export default function App() {
       document.body.style.userSelect = 'auto';
     };
   }, [isDragging]);
+
 
   // --- Full Screen Logic ---
   useEffect(() => {
@@ -622,12 +1133,15 @@ export default function App() {
       }
     };
 
+
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
 
+
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -635,8 +1149,10 @@ export default function App() {
     };
   }, []);
 
+
   const toggleFullScreen = async () => {
     if (!canvasContainerRef.current) return;
+
 
     if (!document.fullscreenElement) {
       try {
@@ -651,10 +1167,12 @@ export default function App() {
     }
   };
 
+
   // --- File Handling with Resize & Clean Base64 ---
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
 
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
@@ -665,6 +1183,7 @@ export default function App() {
                 let width = img.width;
                 let height = img.height;
                 const MAX_SIZE = 1024; // Fix 8001 by limiting dimensions
+
 
                 if (width > height) {
                     if (width > MAX_SIZE) {
@@ -688,6 +1207,7 @@ export default function App() {
                 
                 // Extract RAW BASE64 (strip data:image/...)
                 const rawBase64 = resizedDataUrl.split(',')[1];
+
 
                 setAttachedFile({
                     name: file.name,
@@ -715,11 +1235,14 @@ export default function App() {
     e.target.value = null;
   };
 
+
   const clearAttachment = () => {
     setAttachedFile(null);
   };
 
+
   // --- API Handlers (Streaming) ---
+
 
   const generateStream = async (prompt, explicitMode = "chat") => {
     abortControllerRef.current = new AbortController();
@@ -741,11 +1264,13 @@ export default function App() {
       \`\`\`
     `;
 
+
     // Context from current artifact
     let context = "";
     if (activeArtifact && activeArtifact.code) {
       context = `\n\n[CURRENT CODE CONTEXT]:\n${activeArtifact.code.substring(0, 10000)}\n\n[INSTRUCTION]: If editing, provide the FULL new code. Do not return diffs.`;
     }
+
 
     // Build History (Last 4 turns)
     const recentHistory = messages
@@ -761,11 +1286,13 @@ export default function App() {
         })
         .join('\n\n');
 
+
     // Optimization: Don't send huge history if deleting
     const isDeleteMode = ["delete_all", "delete_memory"].includes(explicitMode);
     const finalPrompt = isDeleteMode 
        ? "DELETE_MEMORY" 
        : `${SYSTEM_INSTRUCTION}${context}\n\n[CHAT HISTORY]\n${recentHistory}\n\nUser Request: ${prompt}`;
+
 
     // Payload Preparation
     const payload = {
@@ -774,6 +1301,7 @@ export default function App() {
       stream: true, 
       session_id: sessionId
     };
+
 
     // Attach File Data if present
     if (attachedFile) {
@@ -786,6 +1314,7 @@ export default function App() {
         }
     }
 
+
     try {
       const response = await fetch(API_URL, {
         method: "POST",
@@ -797,13 +1326,16 @@ export default function App() {
         signal: abortControllerRef.current.signal
       });
 
+
       if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+
 
       // Handle Non-Streaming Responses (Delete Memory / All)
       if (isDeleteMode) {
         const data = await response.json();
         return { text: data.message, isStream: false };
       }
+
 
       // Handle Streaming
       const reader = response.body.getReader();
@@ -818,18 +1350,22 @@ export default function App() {
       // Auto-open canvas on stream start
       if (window.innerWidth >= 768) setIsCanvasOpen(true);
 
+
       // Create a temporary message for streaming
       setMessages(prev => [
         ...prev, 
         { id: 'streaming', role: 'assistant', text: '', artifact: null }
       ]);
 
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
+
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n');
+
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -867,6 +1403,7 @@ export default function App() {
                            codeContent = fullText.substring(headerEnd + 1);
                         }
 
+
                         // Update Artifact in Real-Time
                         if (codeContent.trim().length > 10) {
                            const liveArtifact = {
@@ -886,6 +1423,7 @@ export default function App() {
                   }
                 }
 
+
                 // Update text in chat
                 setMessages(prev => prev.map(msg => 
                   msg.id === 'streaming' 
@@ -900,7 +1438,9 @@ export default function App() {
         }
       }
 
+
       return { text: fullText, isStream: true };
+
 
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -913,6 +1453,7 @@ export default function App() {
       abortControllerRef.current = null;
     }
   };
+
 
   const extractArtifact = (text) => {
     // Regex to find code blocks: ```language ... ```
@@ -941,6 +1482,7 @@ export default function App() {
     return null;
   };
 
+
   const getDisplayText = (text, role) => {
     if (role !== 'assistant') return text;
     // 1. Remove complete code blocks
@@ -950,10 +1492,12 @@ export default function App() {
     return clean.trim();
   };
 
+
   // --- STRICT RESET SESSION LOGIC ---
   const handleResetSession = async () => {
     if (isTyping || isStreaming) return;
     if (!window.confirm("Start a new session? This will clear all chat history.")) return;
+
 
     setIsTyping(true);
     
@@ -968,12 +1512,14 @@ export default function App() {
     setAttachedFile(null);
     setInput("");
 
+
     try {
       // 2. Clear Local Storage & Rotate ID
       await clearDB();
       const newSid = crypto.randomUUID();
       setSessionId(newSid);
       await saveToDB('spider_session_id', newSid);
+
 
       // 3. Notify Backend (Fire & Forget/Best Effort)
       await generateStream("delete_memory", "delete_memory");
@@ -984,6 +1530,7 @@ export default function App() {
     }
   };
 
+
   const handleSend = async () => {
     if ((!input.trim() && !attachedFile) || isTyping || isStreaming) return;
     
@@ -991,8 +1538,9 @@ export default function App() {
     
     // Auto-inject prompt if sending image without text
     if (!userText.trim() && attachedFile) {
-         userText = attachedFile.type === 'image' ? "Analyze this image." : "Analyze this file.";
+          userText = attachedFile.type === 'image' ? "Analyze this image." : "Analyze this file.";
     }
+
 
     const cleanPrompt = userText.trim().toLowerCase();
     
@@ -1003,6 +1551,7 @@ export default function App() {
       return;
     }
 
+
     // --- STANDARD CHAT FLOW ---
     // Show attached file in chat
     let displayText = userText;
@@ -1010,10 +1559,12 @@ export default function App() {
         displayText += `\n[Attached ${attachedFile.type === 'image' ? 'Image' : 'File'}: ${attachedFile.name}]`;
     }
 
+
     const newUserMsg = { id: Date.now(), role: 'user', text: displayText };
     setMessages(prev => [...prev, newUserMsg]);
     setInput("");
     setIsTyping(true);
+
 
     try {
       const result = await generateStream(userText);
@@ -1026,6 +1577,7 @@ export default function App() {
           ? { ...msg, id: Date.now() + 1, artifact: finalArtifact } 
           : msg
       ));
+
 
       if (finalArtifact) {
         setActiveArtifact(finalArtifact);
@@ -1046,6 +1598,7 @@ export default function App() {
     }
   };
 
+
   const handleStop = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -1054,17 +1607,20 @@ export default function App() {
     }
   };
 
+
   const handleAutoFix = async () => {
     if (isTyping || isStreaming) return;
     setInput("Fix bugs and regenerate 100% complete code.");
     setTimeout(handleSend, 0);
   };
 
+
   const copyCode = () => {
     navigator.clipboard.writeText(activeArtifact.code);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
+
 
   return (
     <div className="flex h-[100dvh] w-full bg-[#f8fafc] text-slate-900 font-sans overflow-hidden relative selection:bg-blue-100">
@@ -1073,6 +1629,7 @@ export default function App() {
       {isDragging && (
         <div className="fixed inset-0 z-50 cursor-col-resize bg-transparent" />
       )}
+
 
       {/* --- Sidebar / Chat Panel --- */}
       <div 
@@ -1125,6 +1682,7 @@ export default function App() {
               <Trash2 className="w-5 h-5" />
             </button>
 
+
             {isDataLoaded && (
               <span className="hidden sm:flex text-[10px] text-slate-400 items-center gap-1 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
                 <Database className="w-3 h-3" />
@@ -1141,6 +1699,7 @@ export default function App() {
             )}
           </div>
         </header>
+
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 pb-20">
@@ -1165,6 +1724,7 @@ export default function App() {
                     <span className="inline-block w-2 h-4 bg-indigo-500 ml-1 animate-pulse align-middle"></span>
                   )}
 
+
                   {msg.artifact && (
                     <button 
                       onClick={() => {
@@ -1183,12 +1743,47 @@ export default function App() {
                       <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition" />
                     </button>
                   )}
+
+                  {/* Example Buttons - Your Powerful WebGL/Canvas Demos */}
+                  {msg.examples && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🎮 Spider Canvas Power Demos</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {msg.examples.map((exampleKey) => (
+                          <button
+                            key={exampleKey}
+                            onClick={() => loadExample(exampleKey)}
+                            className="p-4 bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 rounded-xl hover:from-slate-800 hover:to-indigo-900 active:scale-95 transition text-center shadow-lg"
+                          >
+                            <div className="text-3xl mb-2">
+                              {exampleKey === 'grass' ? '🌿' :
+                               exampleKey === 'galaxy' ? '🌌' : 
+                               exampleKey === 'solar' ? '🪐' : 
+                               exampleKey === 'chess' ? '♟️' : '🔬'}
+                            </div>
+                            <p className="text-xs font-bold text-white">
+                              {exampleKey === 'grass' ? 'TerraSim Grass' :
+                               exampleKey === 'galaxy' ? '3D Galaxy' :
+                               exampleKey === 'solar' ? 'Solar System' :
+                               exampleKey === 'chess' ? 'Chess Arena' : 'Engineering Calc'}
+                            </p>
+                            <p className="text-[10px] text-indigo-300 mt-1">
+                              {exampleKey === 'grass' ? 'WebGL Shaders + Audio' :
+                               exampleKey === 'galaxy' || exampleKey === 'solar' ? 'WebGL + Three.js' :
+                               exampleKey === 'chess' ? 'Interactive Game' : 'Physics Solvers'}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
           )}
           <div ref={messagesEndRef} />
         </div>
+
 
         {/* Input Area */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur border-t border-slate-100">
@@ -1215,6 +1810,7 @@ export default function App() {
             </div>
           )}
 
+
           <div className="relative flex items-end gap-2 bg-slate-100 rounded-3xl p-2 border border-transparent transition duration-300 shadow-inner">
             
             {/* File Upload Button */}
@@ -1233,6 +1829,7 @@ export default function App() {
             >
                 <Paperclip className="w-4 h-4" />
             </button>
+
 
             <textarea
               value={input}
@@ -1266,6 +1863,7 @@ export default function App() {
         </div>
       </div>
 
+
       {/* --- Canvas / Preview Panel --- */}
       <main className={`
         flex-col bg-slate-50/50 absolute inset-0 md:relative z-30 md:z-0 md:flex h-full
@@ -1284,11 +1882,13 @@ export default function App() {
               <ArrowLeft className="w-5 h-5" />
             </button>
 
+
             <h2 className="font-semibold text-slate-800 truncate flex items-center gap-2 text-sm md:text-base">
               <span className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-indigo-500 animate-ping' : 'bg-green-500'} `}></span>
               {activeArtifact?.title || "New Session"}
             </h2>
           </div>
+
 
           <div className="flex items-center gap-2">
             
@@ -1302,6 +1902,7 @@ export default function App() {
               <Bug className="w-3.5 h-3.5" />
               Fix
             </button>
+
 
             {/* Device Toggles (Desktop Only) */}
             <div className="hidden md:flex bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
@@ -1318,6 +1919,7 @@ export default function App() {
                 </button>
               ))}
             </div>
+
 
             {/* View Mode Toggle */}
             <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
@@ -1341,6 +1943,7 @@ export default function App() {
               </button>
             </div>
 
+
             {/* Full Screen Toggle */}
             <button 
               onClick={toggleFullScreen}
@@ -1349,6 +1952,7 @@ export default function App() {
             >
               {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
             </button>
+
 
             {/* Actions (Copy) */}
             <div className="hidden sm:flex items-center gap-1 border-l border-slate-200 pl-2 ml-1">
@@ -1361,8 +1965,10 @@ export default function App() {
               </button>
             </div>
 
+
           </div>
         </header>
+
 
         {/* Content Area */}
         <div 
@@ -1407,6 +2013,7 @@ export default function App() {
           )}
         </div>
       </main>
+
 
     </div>
   );

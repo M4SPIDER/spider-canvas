@@ -1,0 +1,828 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  RotateCcw, Trophy, AlertCircle, Info, Settings, 
+  Volume2, VolumeX, Play, Pause, ChevronRight, 
+  Clock, ShieldAlert, Award, Sparkles, Sliders
+} from 'lucide-react';
+
+const SVG_PIECES = {
+  w {
+    p (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M22.5 9c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zM22.5 30c-4.5 0-8 3.5-8 8h16c0-4.5-3.5-8-8-8z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        path d=M22.5 17c-3 0-5.5 2.5-5.5 5.5 0 2.5 2.5 4.5 5.5 4.5s5.5-2 5.5-4.5c0-3-2.5-5.5-5.5-5.5z fill=#FFFFFF stroke=#000 strokeWidth=1.5
+        path d=M18 31c2 .5 7 .5 9 0 stroke=#000 strokeWidth=1.5
+      svg
+    ),
+    r (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M9 39h27v-3H9v3zM12 36h21l-2-6H14l-2 6zM14 30h17v-8H14v8z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M14 14V9h3v3h5V9h3v3h5V9h3v5H14z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M11 14h23l-3 8H14l-3-8z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+      svg
+    ),
+    n (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M22 10c-5 0-9 4-11 9 1 1 2 1.5 3 1.5 3 0 5-2 7-4 1 2 3 4 5 4s4-2 5-4.5c.5.5 1 1 2 1.5 1.5.5 3 .5 4-1-1-4-5-8-11-8z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        path d=M11 19c-1 3-1 8 2 11h19c4-4 4-11 2-14-1 1-3 1.5-4 1.5-3 0-5-2-6-4.5-1 2-3 4.5-6 4.5s-4-2-6-4c-.5 1-1 3.5-1 5.5z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M13 30c1 2 3 4 6 4h12c2-1 4-3 4-5H13z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        circle cx=17 cy=16 r=2 fill=#000
+      svg
+    ),
+    b (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M22.5 8s-6 4-6 9.5c0 3 2.5 5.5 6 5.5s6-2.5 6-5.5C28.5 12 22.5 8 22.5 8z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinecap=round
+        path d=M17.5 22.5c-2 1.5-3 3.5-3 5.5h16c0-2-1-4-3-5.5M22.5 5v3M21 6.5h3 stroke=#000 strokeWidth=1.5 strokeLinecap=round
+        path d=M15 32h15v-4H15v4zM17.5 36h10v-4h-10v4z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M20 14h5M22.5 11.5v5 stroke=#000 strokeWidth=1.5
+      svg
+    ),
+    q (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M9 23h27l3-11-7 4-6-9-6 9-7-4 3 11z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        circle cx=9 cy=12 r=1.5 fill=#FFF stroke=#000
+        circle cx=18 cy=16 r=1.5 fill=#FFF stroke=#000
+        circle cx=22.5 cy=7 r=1.5 fill=#FFF stroke=#000
+        circle cx=27 cy=16 r=1.5 fill=#FFF stroke=#000
+        circle cx=36 cy=12 r=1.5 fill=#FFF stroke=#000
+        path d=M11.5 23l2 11h18l2-11H11.5z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M9 37h27v-3H9v3z fill=#FFFFFF stroke=#000 strokeWidth=1.5
+      svg
+    ),
+    k (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M11.5 31h22l2-14-6 4-7-10-7 10-6-4 2 14z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        path d=M11.5 31H33.5v4H11.5v-4zM9 38h27v-3H9v3z fill=#FFFFFF stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M22.5 5v6M19.5 8h6M22.5 13v4 stroke=#000 strokeWidth=1.5 strokeLinecap=round
+      svg
+    )
+  },
+  b {
+    p (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M22.5 9c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zM22.5 30c-4.5 0-8 3.5-8 8h16c0-4.5-3.5-8-8-8z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        path d=M22.5 17c-3 0-5.5 2.5-5.5 5.5 0 2.5 2.5 4.5 5.5 4.5s5.5-2 5.5-4.5c0-3-2.5-5.5-5.5-5.5z fill=#2B2B2B stroke=#000 strokeWidth=1.5
+        path d=M18 31c2 .5 7 .5 9 0 stroke=#FFF strokeWidth=1
+      svg
+    ),
+    r (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M9 39h27v-3H9v3zM12 36h21l-2-6H14l-2 6zM14 30h17v-8H14v8z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M14 14V9h3v3h5V9h3v3h5V9h3v5H14z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M11 14h23l-3 8H14l-3-8z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+      svg
+    ),
+    n (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M22 10c-5 0-9 4-11 9 1 1 2 1.5 3 1.5 3 0 5-2 7-4 1 2 3 4 5 4s4-2 5-4.5c.5.5 1 1 2 1.5 1.5.5 3 .5 4-1-1-4-5-8-11-8z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        path d=M11 19c-1 3-1 8 2 11h19c4-4 4-11 2-14-1 1-3 1.5-4 1.5-3 0-5-2-6-4.5-1 2-3 4.5-6 4.5s-4-2-6-4c-.5 1-1 3.5-1 5.5z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M13 30c1 2 3 4 6 4h12c2-1 4-3 4-5H13z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        circle cx=17 cy=16 r=2 fill=#FFF
+      svg
+    ),
+    b (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M22.5 8s-6 4-6 9.5c0 3 2.5 5.5 6 5.5s6-2.5 6-5.5C28.5 12 22.5 8 22.5 8z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinecap=round
+        path d=M17.5 22.5c-2 1.5-3 3.5-3 5.5h16c0-2-1-4-3-5.5M22.5 5v3M21 6.5h3 stroke=#000 strokeWidth=1.5 strokeLinecap=round
+        path d=M15 32h15v-4H15v4zM17.5 36h10v-4h-10v4z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M20 14h5M22.5 11.5v5 stroke=#FFF strokeWidth=1
+      svg
+    ),
+    q (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M9 23h27l3-11-7 4-6-9-6 9-7-4 3 11z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        circle cx=9 cy=12 r=1.5 fill=#2B2B2B stroke=#000
+        circle cx=18 cy=16 r=1.5 fill=#2B2B2B stroke=#000
+        circle cx=22.5 cy=7 r=1.5 fill=#2B2B2B stroke=#000
+        circle cx=27 cy=16 r=1.5 fill=#2B2B2B stroke=#000
+        circle cx=36 cy=12 r=1.5 fill=#2B2B2B stroke=#000
+        path d=M11.5 23l2 11h18l2-11H11.5z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M9 37h27v-3H9v3z fill=#2B2B2B stroke=#000 strokeWidth=1.5
+      svg
+    ),
+    k (className) = (
+      svg className={className} viewBox=0 0 45 45 fill=none xmlns=httpwww.w3.org2000svg
+        path d=M11.5 31h22l2-14-6 4-7-10-7 10-6-4 2 14z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinecap=round strokeLinejoin=round
+        path d=M11.5 31H33.5v4H11.5v-4zM9 38h27v-3H9v3z fill=#2B2B2B stroke=#000 strokeWidth=1.5 strokeLinejoin=round
+        path d=M22.5 5v6M19.5 8h6M22.5 13v4 stroke=#FFF strokeWidth=1 strokeLinecap=round
+      svg
+    )
+  }
+};
+
+const THEMES = {
+  emerald {
+    dark 'bg-[#769656] text-[#eeeed2]',
+    light 'bg-[#eeeed2] text-[#769656]',
+    selected 'ring-4 ring-yellow-400 ring-inset bg-yellow-20050',
+    valid 'aftercontent-[] afterw-4 afterh-4 afterbg-emerald-95020 afterrounded-full afterabsolute hoverbg-emerald-95010',
+    validCapture 'ring-4 ring-red-50050 ring-inset',
+    lastMove 'bg-[#bbc343]70',
+    name 'Emerald Club',
+    primary 'bg-[#769656]'
+  },
+  classic {
+    dark 'bg-[#b58863] text-[#f0d9b5]',
+    light 'bg-[#f0d9b5] text-[#b58863]',
+    selected 'ring-4 ring-amber-400 ring-inset bg-amber-20050',
+    valid 'aftercontent-[] afterw-4 afterh-4 afterbg-amber-95020 afterrounded-full afterabsolute hoverbg-amber-95010',
+    validCapture 'ring-4 ring-rose-50050 ring-inset',
+    lastMove 'bg-[#dac343]70',
+    name 'Classic Wood',
+    primary 'bg-[#b58863]'
+  },
+  tournament {
+    dark 'bg-[#4b7399] text-[#eae9d2]',
+    light 'bg-[#eae9d2] text-[#4b7399]',
+    selected 'ring-4 ring-sky-400 ring-inset bg-sky-20050',
+    valid 'aftercontent-[] afterw-4 afterh-4 afterbg-sky-95020 afterrounded-full afterabsolute hoverbg-sky-95010',
+    validCapture 'ring-4 ring-red-50050 ring-inset',
+    lastMove 'bg-[#b7c343]70',
+    name 'Championship Blue',
+    primary 'bg-[#4b7399]'
+  },
+  midnight {
+    dark 'bg-[#2e2e38] text-[#9a9aa8]',
+    light 'bg-[#4a4a5a] text-[#2e2e38]',
+    selected 'ring-4 ring-indigo-400 ring-inset bg-indigo-50030',
+    valid 'aftercontent-[] afterw-4 afterh-4 afterbg-indigo-40030 afterrounded-full afterabsolute hoverbg-indigo-40020',
+    validCapture 'ring-4 ring-pink-50050 ring-inset',
+    lastMove 'bg-[#4c3d75]70',
+    name 'Midnight Cyber',
+    primary 'bg-[#2e2e38]'
+  }
+};
+
+const INITIAL_BOARD = [
+  ['br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br'],
+  ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
+  Array(8).fill(null), Array(8).fill(null), Array(8).fill(null), Array(8).fill(null),
+  ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
+  ['wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr'],
+];
+
+const playMoveSound = (isCapture) = {
+  try {
+    const ctx = new (window.AudioContext  window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    if (isCapture) {
+       Deeper percussion style sound for captures
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(70, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } else {
+       Soft, clean click sound for standard moves
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    }
+  } catch (e) {
+    console.warn(Audio Context blocked or unsupported);
+  }
+};
+
+const isValidMove = (board, start, end, piece) = {
+  const [startR, startC] = start;
+  const [endR, endC] = end;
+  
+  if (startR === endR && startC === endC) return false;
+  
+  const target = board[endR][endC];
+  const type = piece[1];
+  const color = piece[0];
+
+  if (target && target[0] === color) return false;
+
+  const dr = endR - startR;
+  const dc = endC - startC;
+
+  switch (type) {
+    case 'p'
+      const direction = color === 'w'  -1  1;
+      const startRow = color === 'w'  6  1;
+       Single step forward
+      if (dc === 0 && !target) {
+        if (dr === direction) return true;
+         Double step forward from initial row
+        if (dr === 2  direction && startR === startRow && !board[startR + direction][startC]) return true;
+      }
+       Standard diagonal captures
+      if (Math.abs(dc) === 1 && dr === direction && target) return true;
+      return false;
+      
+    case 'n'
+      return (Math.abs(dr) === 2 && Math.abs(dc) === 1)  (Math.abs(dr) === 1 && Math.abs(dc) === 2);
+      
+    case 'k'
+      return Math.abs(dr) = 1 && Math.abs(dc) = 1;
+      
+    case 'r'
+      if (dr !== 0 && dc !== 0) return false;
+      return isPathClear(board, start, end);
+      
+    case 'b'
+      if (Math.abs(dr) !== Math.abs(dc)) return false;
+      return isPathClear(board, start, end);
+      
+    case 'q'
+      if ((dr !== 0 && dc !== 0) && (Math.abs(dr) !== Math.abs(dc))) return false;
+      return isPathClear(board, start, end);
+      
+    default
+      return false;
+  }
+};
+
+const isPathClear = (board, start, end) = {
+  const [r1, c1] = start;
+  const [r2, c2] = end;
+  const dr = Math.sign(r2 - r1);
+  const dc = Math.sign(c2 - c1);
+  let r = r1 + dr;
+  let c = c1 + dc;
+  while (r !== r2  c !== c2) {
+    if (board[r][c]) return false;
+    r += dr;
+    c += dc;
+  }
+  return true;
+};
+
+ Simple Algebraic conversion for chess move notation logger
+const toAlgebraic = (r, c) = {
+  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+  return `${files[c]}${ranks[r]}`;
+};
+
+const getPieceName = (type) = {
+  const names = { p 'Pawn', r 'Rook', n 'Knight', b 'Bishop', q 'Queen', k 'King' };
+  return names[type]  '';
+};
+
+export default function ChessApp() {
+  const [board, setBoard] = useState(INITIAL_BOARD);
+  const [turn, setTurn] = useState('w');
+  const [selected, setSelected] = useState(null);
+  const [captured, setCaptured] = useState({ w [], b [] });
+  const [message, setMessage] = useState(White to move);
+  const [lastMove, setLastMove] = useState(null);  { start [r,c], end [r,c] }
+  const [theme, setTheme] = useState('emerald');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  
+   Timer States
+  const [timePreset, setTimePreset] = useState(300);  Default 5 minutes (300s)
+  const [whiteTime, setWhiteTime] = useState(300);
+  const [blackTime, setBlackTime] = useState(300);
+  const [clockActive, setClockActive] = useState(false);
+  const [gameActive, setGameActive] = useState(true);
+  const [winner, setWinner] = useState(null);  'w', 'b', or 'draw'
+  
+   Move log state
+  const [moveLog, setMoveLog] = useState([]);
+  
+   Timer Interval Ref
+  const timerRef = useRef(null);
+
+  useEffect(() = {
+    if (clockActive && gameActive && !winner) {
+      timerRef.current = setInterval(() = {
+        if (turn === 'w') {
+          setWhiteTime((prev) = {
+            if (prev = 1) {
+              clearInterval(timerRef.current);
+              setWinner('b');
+              setMessage(Black wins on time!);
+              setGameActive(false);
+              return 0;
+            }
+            return prev - 1;
+          });
+        } else {
+          setBlackTime((prev) = {
+            if (prev = 1) {
+              clearInterval(timerRef.current);
+              setWinner('w');
+              setMessage(White wins on time!);
+              setGameActive(false);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+
+    return () = clearInterval(timerRef.current);
+  }, [clockActive, turn, gameActive, winner]);
+
+  const changePreset = (seconds) = {
+    setTimePreset(seconds);
+    setWhiteTime(seconds);
+    setBlackTime(seconds);
+    setClockActive(false);
+    resetGame(seconds);
+  };
+
+  const getValidMovesForSelected = () = {
+    if (!selected) return [];
+    const moves = [];
+    const piece = board[selected.r][selected.c];
+    if (!piece) return [];
+    
+    for (let r = 0; r  8; r++) {
+      for (let c = 0; c  8; c++) {
+        if (isValidMove(board, [selected.r, selected.c], [r, c], piece)) {
+          moves.push({ r, c });
+        }
+      }
+    }
+    return moves;
+  };
+
+  const validMoves = getValidMovesForSelected();
+
+  const handleSquareClick = (r, c) = {
+    if (!gameActive) return;
+
+    if (selected) {
+       Cancel selection on same square click
+      if (r === selected.r && c === selected.c) {
+        setSelected(null);
+        return;
+      }
+
+      const piece = board[selected.r][selected.c];
+      
+       Allow switching selection to another of player's own pieces
+      if (board[r][c] && board[r][c][0] === turn) {
+        setSelected({ r, c });
+        return;
+      }
+
+      if (isValidMove(board, [selected.r, selected.c], [r, c], piece)) {
+         Start clock on first move
+        if (!clockActive) {
+          setClockActive(true);
+        }
+
+        const newBoard = board.map(row = [...row]);
+        const target = newBoard[r][c];
+        const isCapture = !!target;
+
+         Sound Feedback
+        if (soundEnabled) {
+          playMoveSound(isCapture);
+        }
+
+         Handle Captured Pieces
+        if (target) {
+          setCaptured(prev = ({
+            ...prev,
+            [turn === 'w'  'b'  'w'] [...prev[turn === 'w'  'b'  'w'], target]
+          }));
+        }
+
+         Execute Move
+        newBoard[r][c] = piece;
+        newBoard[selected.r][selected.c] = null;
+        
+         Save move history
+        const algebraicMove = `${getPieceName(piece[1])[0] === 'P'  ''  getPieceName(piece[1])[0]}${isCapture  'x'  ''}${toAlgebraic(r, c)}`;
+        setMoveLog(prev = {
+          if (turn === 'w') {
+            return [...prev, { num prev.length + 1, w algebraicMove, b null }];
+          } else {
+            const updated = [...prev];
+            if (updated.length  0) {
+              updated[updated.length - 1].b = algebraicMove;
+            }
+            return updated;
+          }
+        });
+
+         Set state values
+        setBoard(newBoard);
+        setLastMove({ start [selected.r, selected.c], end [r, c] });
+        setTurn(turn === 'w'  'b'  'w');
+        setMessage(`${turn === 'w'  Black's  White's} turn`);
+        setSelected(null);
+
+         Simple Win Condition Check If King Captured
+        if (target && target[1] === 'k') {
+          setWinner(turn);
+          setGameActive(false);
+          setClockActive(false);
+          setMessage(`Checkmate! ${turn === 'w'  'White'  'Black'} wins!`);
+        }
+      } else {
+         Clear selection if invalid spot clicked
+        setSelected(null);
+      }
+    } else {
+       Pick up a piece
+      if (board[r][c] && board[r][c][0] === turn) {
+        setSelected({ r, c });
+      }
+    }
+  };
+
+  const resetGame = (preset = timePreset) = {
+    setBoard(INITIAL_BOARD);
+    setTurn('w');
+    setCaptured({ w [], b [] });
+    setMessage(White's turn - Make your move);
+    setSelected(null);
+    setLastMove(null);
+    setWhiteTime(preset);
+    setBlackTime(preset);
+    setClockActive(false);
+    setGameActive(true);
+    setWinner(null);
+    setMoveLog([]);
+  };
+
+   Helper formatting for timer
+  const formatTime = (seconds) = {
+    const mins = Math.floor(seconds  60);
+    const secs = seconds % 60;
+    return `${mins}${secs  10  '0'  ''}${secs}`;
+  };
+
+   Calculate scores (Material Balance)
+  const pieceValues = { p 1, n 3, b 3, r 5, q 9, k 0 };
+  const getScoreDiff = () = {
+    let wScore = 0;
+    let bScore = 0;
+    captured.w.forEach(p = wScore += pieceValues[p[1]]);
+    captured.b.forEach(p = bScore += pieceValues[p[1]]);
+    
+    const diff = wScore - bScore;
+    return {
+      whiteLead diff  0  `+${diff}`  null,
+      blackLead diff  0  `+${Math.abs(diff)}`  null
+    };
+  };
+
+  const scoreDiff = getScoreDiff();
+
+  return (
+    div className=min-h-screen bg-[#161512] text-stone-200 flex flex-col items-center justify-between font-sans selectionbg-yellow-400 selectiontext-black
+      
+      {}
+      header className=w-full bg-[#1e1c18] border-b border-stone-800 py-4 px-6 flex items-center justify-between shadow-md
+        div className=flex items-center gap-3
+          div className=p-2.5 bg-yellow-50010 rounded-xl border border-yellow-50020 text-yellow-500 animate-pulse
+            Trophy size={24} className=stroke-[1.75] 
+          div
+          div
+            h1 className=text-xl font-bold tracking-tight text-stone-100 flex items-center gap-2
+              Arena Arena span className=text-xs bg-yellow-50020 text-yellow-500 font-mono px-1.5 py-0.5 rounded uppercasePRO UIspan
+            h1
+            p className=text-xs text-stone-400Competitive Play Roomp
+          div
+        div
+
+        div className=flex items-center gap-4
+          button 
+            onClick={() = setSoundEnabled(!soundEnabled)}
+            className={`p-2 rounded-lg border transition ${soundEnabled  'bg-stone-800 border-stone-700 text-yellow-500 hoverbg-stone-700'  'bg-stone-900 border-stone-800 text-stone-500 hoverbg-stone-800'}`}
+            title={soundEnabled  Mute Game Sound  Enable Sound FX}
+          
+            {soundEnabled  Volume2 size={18}   VolumeX size={18} }
+          button
+          
+          div className=flex bg-stone-900 rounded-lg p-1 border border-stone-800
+            {Object.keys(THEMES).map((themeKey) = (
+              button
+                key={themeKey}
+                onClick={() = setTheme(themeKey)}
+                className={`text-xs px-3 py-1.5 rounded-md font-medium capitalize transition-all ${
+                  theme === themeKey 
+                     'bg-[#312e2b] text-white shadow-sm' 
+                     'text-stone-400 hovertext-white'
+                }`}
+              
+                {themeKey}
+              button
+            ))}
+          div
+        div
+      header
+
+      {}
+      main className=w-full max-w-7xl flex-1 flex flex-col lgflex-row gap-8 items-stretch justify-center p-4 lgp-8
+        
+        { LEFT COLUMN Chessboard & Players HUD }
+        div className=flex-1 flex flex-col justify-center max-w-[640px] mx-auto w-full
+          
+          { OPPONENT PROFILE (Black Player) }
+          div className=flex items-center justify-between mb-3 px-2
+            div className=flex items-center gap-3
+              div className=w-10 h-10 rounded-lg bg-stone-800 border border-stone-700 flex items-center justify-center font-bold text-stone-300
+                B
+              div
+              div
+                div className=flex items-center gap-1.5
+                  span className=font-semibold text-stone-200Grandmaster AIspan
+                  span className=text-[10px] bg-stone-800 text-stone-400 px-1 py-0.2 rounded font-mono2400span
+                div
+                { Captured pieces by Black }
+                div className=flex items-center gap-0.5 mt-0.5 h-6
+                  {captured.b.map((p, i) = (
+                    div key={i} className=w-5 h-5 bg-stone-80040 rounded flex items-center justify-center text-xs opacity-80 hoveropacity-100
+                      {SVG_PIECES[p[0]][p[1]](w-4 h-4)}
+                    div
+                  ))}
+                  {scoreDiff.blackLead && (
+                    span className=text-xs text-emerald-500 font-bold ml-1.5{scoreDiff.blackLead}span
+                  )}
+                div
+              div
+            div
+
+            { BLACK CLOCK }
+            div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-mono text-lg font-bold shadow-inner transition-colors duration-300 ${
+              turn === 'b' && gameActive && clockActive
+                 'bg-amber-50010 border-amber-50050 text-amber-500 ring-2 ring-amber-50020' 
+                 'bg-[#262421] border-stone-800 text-stone-400'
+            }`}
+              Clock size={16} className={turn === 'b' && gameActive && clockActive  'animate-spin'  ''} 
+              {formatTime(blackTime)}
+            div
+          div
+
+          { CHESSBOARD GRID }
+          div className=relative aspect-square w-full rounded-2xl overflow-hidden border-[6px] border-[#262421] shadow-2xl
+            div className=grid grid-cols-8 h-full w-full
+              {board.map((row, r) =
+                row.map((piece, c) = {
+                  const isDark = (r + c) % 2 !== 0;
+                  const isSelected = selected && selected.r === r && selected.c === c;
+                  const isValid = validMoves.some(m = m.r === r && m.c === c);
+                  const isCapturedSpot = isValid && board[r][c];
+                  const wasLastMoved = lastMove && (
+                    (lastMove.start[0] === r && lastMove.start[1] === c) 
+                    (lastMove.end[0] === r && lastMove.end[1] === c)
+                  );
+
+                   Set up dynamic responsive styles
+                  let squareTheme = isDark  THEMES[theme].dark  THEMES[theme].light;
+                  let interactiveOverlay = ;
+                  
+                  if (isSelected) {
+                    interactiveOverlay = THEMES[theme].selected;
+                  } else if (isCapturedSpot) {
+                    interactiveOverlay = THEMES[theme].validCapture;
+                  } else if (isValid) {
+                    interactiveOverlay = THEMES[theme].valid;
+                  } else if (wasLastMoved) {
+                    interactiveOverlay = THEMES[theme].lastMove;
+                  }
+
+                  return (
+                    div
+                      key={`${r}-${c}`}
+                      onClick={() = handleSquareClick(r, c)}
+                      className={`relative aspect-square flex items-center justify-center cursor-pointer transition-all duration-150 select-none ${squareTheme} ${interactiveOverlay}`}
+                    
+                      { Interactive Piece Rendering }
+                      {piece && SVG_PIECES[piece[0]][piece[1]](w-56 h-56 drop-shadow-md transform transition hoverscale-105 activescale-95)}
+
+                      { Rank Label (numbers on left column) }
+                      {c === 0 && (
+                        span className={`absolute top-1.5 left-1.5 text-[9px] font-bold pointer-events-none font-mono ${
+                          isDark  THEMES[theme].light  THEMES[theme].dark
+                        }`}
+                          {8 - r}
+                        span
+                      )}
+
+                      { File Label (letters on bottom row) }
+                      {r === 7 && (
+                        span className={`absolute bottom-1 right-1.5 text-[9px] font-bold pointer-events-none font-mono ${
+                          isDark  THEMES[theme].light  THEMES[theme].dark
+                        }`}
+                          {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'][c]}
+                        span
+                      )}
+                    div
+                  );
+                })
+              )}
+            div
+
+            { GAME OVER DIALOG OVERLAY }
+            {!gameActive && (
+              div className=absolute inset-0 bg-black80 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in
+                div className=bg-stone-900 border border-stone-800 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden
+                  div className=absolute -right-10 -top-10 w-32 h-32 bg-yellow-5005 rounded-full 
+                  
+                  div className=w-16 h-16 bg-yellow-50015 text-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-yellow-50030
+                    Award size={36} 
+                  div
+                  
+                  h3 className=text-2xl font-bold text-white mb-2Game Overh3
+                  p className=text-stone-400 text-sm mb-6 uppercase tracking-wider font-mono bg-stone-950 p-3 rounded-lg border border-stone-800
+                    {message}
+                  p
+
+                  div className=space-y-2
+                    button
+                      onClick={() = resetGame()}
+                      className=w-full py-3 bg-yellow-500 hoverbg-yellow-400 text-stone-950 font-bold rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-yellow-50020
+                    
+                      RotateCcw size={18}  Play Again
+                    button
+                    button
+                      onClick={() = { setGameActive(true); setWinner(null); }}
+                      className=w-full py-2.5 bg-stone-800 hoverbg-stone-700 text-stone-300 font-semibold rounded-xl transition duration-150 text-sm
+                    
+                      Dismiss View
+                    button
+                  div
+                div
+              div
+            )}
+          div
+
+          { USER PROFILE (White Player) }
+          div className=flex items-center justify-between mt-3 px-2
+            div className=flex items-center gap-3
+              div className=w-10 h-10 rounded-lg bg-yellow-50010 border border-yellow-50030 flex items-center justify-center font-bold text-yellow-500
+                W
+              div
+              div
+                div className=flex items-center gap-1.5
+                  span className=font-semibold text-stone-200Player 1 (You)span
+                  span className=text-[10px] bg-stone-800 text-stone-400 px-1 py-0.2 rounded font-mono1500span
+                div
+                { Captured pieces by White }
+                div className=flex items-center gap-0.5 mt-0.5 h-6
+                  {captured.w.map((p, i) = (
+                    div key={i} className=w-5 h-5 bg-stone-80040 rounded flex items-center justify-center text-xs opacity-80 hoveropacity-100
+                      {SVG_PIECES[p[0]][p[1]](w-4 h-4)}
+                    div
+                  ))}
+                  {scoreDiff.whiteLead && (
+                    span className=text-xs text-yellow-500 font-bold ml-1.5{scoreDiff.whiteLead}span
+                  )}
+                div
+              div
+            div
+
+            { WHITE CLOCK }
+            div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-mono text-lg font-bold shadow-inner transition-colors duration-300 ${
+              turn === 'w' && gameActive && clockActive
+                 'bg-yellow-50010 border-yellow-50050 text-yellow-500 ring-2 ring-yellow-50020' 
+                 'bg-[#262421] border-stone-800 text-stone-400'
+            }`}
+              Clock size={16} className={turn === 'w' && gameActive && clockActive  'animate-spin'  ''} 
+              {formatTime(whiteTime)}
+            div
+          div
+
+        div
+
+        { RIGHT COLUMN Interactive Control Center & Live Move Logger }
+        div className=w-full lgw-80 flex flex-col justify-between gap-6
+          
+          { STATS & CONTROLS CONTAINER }
+          div className=bg-[#1e1c18] border border-stone-80080 rounded-2xl p-5 flex flex-col flex-1 shadow-lg
+            
+            { MATCH CONTROL BAR }
+            div className=flex items-center justify-between mb-5 border-b border-stone-800 pb-3
+              h2 className=font-bold text-stone-300 text-sm flex items-center gap-2 tracking-wide uppercase
+                Sliders size={16} className=text-yellow-500  Match Settings
+              h2
+              span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded ${
+                clockActive  'bg-emerald-50010 text-emerald-400'  'bg-red-50010 text-red-400'
+              }`}
+                {clockActive  'Live Clock'  'Paused'}
+              span
+            div
+
+            { TIME FORMAT SETTINGS }
+            div className=mb-4
+              label className=text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-2Timer Presetslabel
+              div className=grid grid-cols-3 gap-2
+                {[
+                  { label '3 min', sec 180 },
+                  { label '5 min', sec 300 },
+                  { label '10 min', sec 600 }
+                ].map((preset) = (
+                  button
+                    key={preset.sec}
+                    onClick={() = changePreset(preset.sec)}
+                    className={`py-2 text-xs font-semibold rounded-lg transition-all border ${
+                      timePreset === preset.sec 
+                         'bg-[#312e2b] text-yellow-500 border-yellow-50040 shadow-md' 
+                         'bg-[#161512] text-stone-400 border-stone-800 hovertext-white'
+                    }`}
+                  
+                    {preset.label}
+                  button
+                ))}
+              div
+            div
+
+            { ACTIVE GAME LOG }
+            div className=flex-1 flex flex-col mt-2 min-h-[180px]
+              label className=text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-2Live Move Loglabel
+              div className=bg-[#161512] rounded-xl border border-stone-80080 flex-1 p-3 overflow-y-auto max-h-[220px] scrollbar-thin
+                {moveLog.length === 0  (
+                  div className=h-full flex flex-col items-center justify-center text-center text-stone-500 text-xs py-8
+                    Info size={16} className=mb-1 text-stone-600 
+                    spanNo moves logged yet.span
+                    spanMake your first move!span
+                  div
+                )  (
+                  table className=w-full text-xs font-mono
+                    thead
+                      tr className=border-b border-stone-80050 pb-2 text-stone-500 text-left
+                        th className=py-1 w-12No.th
+                        th className=py-1Whiteth
+                        th className=py-1Blackth
+                      tr
+                    thead
+                    tbody className=divide-y divide-stone-80030
+                      {moveLog.map((log) = (
+                        tr key={log.num} className=hoverbg-stone-80020
+                          td className=py-1.5 text-stone-500 font-bold{log.num}.td
+                          td className=py-1.5 text-amber-20090 font-semibold{log.w}td
+                          td className=py-1.5 text-stone-300{log.b  span className=text-stone-600...span}td
+                        tr
+                      ))}
+                    tbody
+                  table
+                )}
+              div
+            div
+
+            { ACTION FOOTER CONTROLS }
+            div className=grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-stone-800
+              button
+                onClick={() = resetGame()}
+                className=py-2.5 rounded-lg bg-[#312e2b] hoverbg-[#3d3a36] text-stone-300 font-bold text-xs transition duration-150 flex items-center justify-center gap-2 border border-stone-800
+              
+                RotateCcw size={14}  Reset Board
+              button
+              
+              button
+                onClick={() = {
+                  setWinner(turn === 'w'  'b'  'w');
+                  setGameActive(false);
+                  setClockActive(false);
+                  setMessage(`${turn === 'w'  'White'  'Black'} Resigned!`);
+                }}
+                disabled={!gameActive}
+                className={`py-2.5 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border ${
+                  gameActive 
+                     'bg-red-50010 hoverbg-red-50020 text-red-400 border-red-50030' 
+                     'bg-stone-900 text-stone-600 border-stone-800 cursor-not-allowed'
+                }`}
+              
+                ShieldAlert size={14}  Resign
+              button
+            div
+
+          div
+
+          { DYNAMIC RULES  PRO TIPS }
+          div className=bg-[#1e1c18] border border-stone-80080 rounded-2xl p-4 flex gap-3 shadow-lg
+            div className=p-2 bg-yellow-50010 text-yellow-500 rounded-lg self-start
+              Sparkles size={16} 
+            div
+            div className=flex-1
+              h4 className=text-xs font-bold text-stone-200 uppercase tracking-wideInterface Tiph4
+              p className=text-xs text-stone-400 mt-1 leading-relaxed
+                Clicking on your piece will show potential moves in soft circles. Sound indicators are generated dynamically using real-time Synth Audio!
+              p
+            div
+          div
+
+        div
+
+      main
+
+      { FOOTER }
+      footer className=w-full bg-[#1e1c18] border-t border-stone-800 py-3 text-center text-xs text-stone-500 font-mono
+        Chess App Pro UI © 2026 • Made with absolute precision
+      footer
+    div
+  );
+}

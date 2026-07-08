@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TerraSim: Interactive Cinematic Lawn Showcase</title>
+  <!-- Tailwind CSS for minimalist glass control overlay -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for iconography -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts for premium typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Three.js OrbitControls -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    .cinzel-font {
+      font-family: 'Cinzel', serif;
+    }
+    /* Custom thin glassmorphism panel */
+    .glass-deck {
+      background: rgba(8, 10, 15, 0.55);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Hide scrollbars completely */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    /* Video production crop borders overlay */
+    .viewfinder-corner {
+      width: 24px;
+      height: 24px;
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-black text-slate-100 w-screen h-screen relative">
+
+  <!-- 3D WebGL Canvas -->
+  <canvas id="gardenCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
+
+  <!-- FLOATING HIDE/SHOW BUTTON -->
+  <button id="btn-hide-ui" class="fixed top-4 right-4 z-50 glass-deck w-12 h-12 rounded-xl flex items-center justify-center text-amber-400 hover:text-white transition-all cursor-pointer" title="Hide/Show UI">
+    <i class="fa-solid fa-eye-slash text-sm"></i>
+  </button>
+
+  <!-- CINEMATIC PREloader -->
+  <div id="cinematic-loader" class="absolute inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center transition-opacity duration-1500">
+    <div class="relative flex items-center justify-center mb-6">
+      <div class="w-20 h-20 rounded-full border-2 border-amber-500/20 border-t-amber-400 animate-spin"></div>
+      <i class="fa-solid fa-leaf text-amber-500 text-2xl absolute animate-pulse"></i>
+    </div>
+    <h1 class="cinzel-font text-2xl tracking-widest text-amber-200">TERRASIM BOTANICA</h1>
+    <p class="text-xs text-neutral-400 tracking-widest uppercase mt-2">Compiling High-Fidelity Light Scattering...</p>
+    <div class="w-48 bg-neutral-800 h-[1px] mt-6 overflow-hidden">
+      <div id="load-progress-bar" class="bg-amber-400 h-full w-0 transition-all duration-300"></div>
+    </div>
+  </div>
+
+  <!-- CAMERA VIEWFINDER OVERLAY (Removes "game feel", introduces cinematic feel) -->
+  <div class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-6 select-none opacity-0 transition-opacity duration-1000" id="cinema-hud">
+    <!-- Viewfinder Corners -->
+    <div class="absolute top-6 left-6 viewfinder-corner border-t-2 border-l-2"></div>
+    <div class="absolute top-6 right-6 viewfinder-corner border-t-2 border-r-2"></div>
+    <div class="absolute bottom-6 left-6 viewfinder-corner border-b-2 border-l-2"></div>
+    <div class="absolute bottom-6 right-6 viewfinder-corner border-b-2 border-r-2"></div>
+
+    <!-- UPPER BAR: CAMERA META -->
+    <header class="w-full flex justify-between items-start pointer-events-auto">
+      <div class="glass-deck px-4 py-2.5 rounded-xl flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+          <span class="text-[10px] font-bold tracking-widest text-red-500 uppercase">REC MODE</span>
+        </div>
+        <div class="w-[1px] h-4 bg-white/10"></div>
+        <div class="text-[10px] text-slate-300 font-mono tracking-wider">
+          FOCAL SPEED: <span id="shutter-speed-display">1.5x</span>
+        </div>
+      </div>
+
+      <!-- Quick Audio, View Mod, and Manual Control Buttons -->
+      <div class="flex gap-2">
+        <button id="cinematic-play-btn" class="glass-deck px-4 py-2.5 rounded-xl text-[10px] font-semibold tracking-wider text-amber-400 flex items-center gap-2 hover:bg-white/5 active:scale-95 transition-all">
+          <i class="fa-solid fa-play"></i> <span id="camera-mode-label">CAM TRACKING ACTIVED</span>
+        </button>
+        <button id="synth-vol-btn" class="glass-deck w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-amber-400 transition-all">
+          <i class="fa-solid fa-volume-xmark text-sm"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- LOWER DECK: CINEMATIC CONTROLS -->
+    <footer class="w-full flex flex-col lg:flex-row gap-4 items-end justify-between pointer-events-auto z-20">
+      
+      <!-- LEFT MODULE: ENVIRONMENT PRESETS -->
+      <div class="glass-deck p-5 rounded-2xl flex flex-col gap-4 w-full lg:max-w-md">
+        <div class="flex justify-between items-center border-b border-white/5 pb-2">
+          <span class="cinzel-font text-sm tracking-wider text-amber-100 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-xs text-amber-400"></i> Lighting & Color Profile
+          </span>
+          <span class="text-[10px] uppercase text-neutral-400 font-mono">Presets</span>
+        </div>
+
+        <!-- Lighting Profiles Buttons -->
+        <div class="grid grid-cols-2 gap-2">
+          <button id="preset-golden" class="bg-amber-500/10 border border-amber-500/40 py-2 rounded-xl text-xs font-medium text-amber-400 transition-all hover:bg-amber-500/15">
+            🌅 Golden Hour
+          </button>
+          <button id="preset-overcast" class="bg-neutral-900 border border-transparent hover:border-white/10 py-2 rounded-xl text-xs font-medium text-slate-300 transition-all">
+            🌫️ Forest Mist
+          </button>
+          <button id="preset-midday" class="bg-neutral-900 border border-transparent hover:border-white/10 py-2 rounded-xl text-xs font-medium text-slate-300 transition-all">
+            ☀️ High Noon
+          </button>
+          <button id="preset-autumn" class="bg-neutral-900 border border-transparent hover:border-white/10 py-2 rounded-xl text-xs font-medium text-slate-300 transition-all">
+            🍁 Autumn Warmth
+          </button>
+        </div>
+
+        <!-- Real-time sliders -->
+        <div class="flex flex-col gap-3 mt-1">
+          <!-- Light Angle Slider -->
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[10px] tracking-wide text-neutral-400">
+              <span>SUN POSITION</span>
+              <span id="light-angle-val" class="text-amber-400">Sunset Sunset</span>
+            </div>
+            <input type="range" id="sun-angle-slider" min="0" max="180" step="1" value="25" class="w-full accent-amber-500 bg-neutral-800 h-1 rounded">
+          </div>
+
+          <!-- Wind intensity Slider -->
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[10px] tracking-wide text-neutral-400">
+              <span>WIND INTENSITY</span>
+              <span id="wind-strength-val" class="text-amber-400">Gentle Breeze</span>
+            </div>
+            <input type="range" id="wind-slider" min="0" max="100" step="1" value="35" class="w-full accent-amber-500 bg-neutral-800 h-1 rounded">
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT MODULE: CINEMATIC CAMERA SYSTEM -->
+      <div class="glass-deck p-5 rounded-2xl flex flex-col gap-3 w-full lg:max-w-xs">
+        <div class="flex justify-between items-center border-b border-white/5 pb-2">
+          <span class="cinzel-font text-sm tracking-wider text-amber-100 flex items-center gap-2">
+            <i class="fa-solid fa-video text-xs text-amber-400"></i> Camera Rail
+          </span>
+          <span class="text-[10px] uppercase text-neutral-400 font-mono">Dolly</span>
+        </div>
+
+        <!-- Camera Track selection list -->
+        <div class="flex flex-col gap-1.5 text-xs text-slate-300">
+          <button id="track-orbit" class="w-full text-left bg-amber-500/10 border border-amber-500/30 px-3 py-2 rounded-xl flex items-center justify-between text-amber-400">
+            <span>Slow Lawn Panorama</span>
+            <span class="text-[9px] px-1.5 py-0.5 bg-amber-400/20 rounded">Path A</span>
+          </button>
+          <button id="track-low" class="w-full text-left hover:bg-white/5 px-3 py-2 rounded-xl flex items-center justify-between">
+            <span>Macro Grass Slider</span>
+            <span class="text-[9px] px-1.5 py-0.5 bg-white/10 rounded">Path B</span>
+          </button>
+          <button id="track-dolly" class="w-full text-left hover:bg-white/5 px-3 py-2 rounded-xl flex items-center justify-between">
+            <span>Golden Canopy Tilt</span>
+            <span class="text-[9px] px-1.5 py-0.5 bg-white/10 rounded">Path C</span>
+          </button>
+          <button id="track-manual" class="w-full text-left hover:bg-white/5 px-3 py-2 rounded-xl flex items-center justify-between">
+            <span>Free Orbit Manual Control</span>
+            <span class="text-[9px] px-1.5 py-0.5 bg-white/10 rounded">Interactive</span>
+          </button>
+        </div>
+      </div>
+
+    </footer>
+  </div>
+
+  <script>
+    // --- HIGH-FIDELITY WEB AUDIO NATURE SYNTH ---
+    class AtmosphericAudioSynth {
+      constructor() {
+        this.ctx = null;
+        this.windGain = null;
+        this.cricketGain = null;
+        this.isPlaying = false;
+      }
+
+      init() {
+        if (this.ctx) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+
+        // 1. Create wind node (Filter modulated white noise)
+        this.windGain = this.ctx.createGain();
+        this.windGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.setupNoiseWind(this.windGain, 180);
+
+        // 2. Synthesize cricket chirps in background
+        this.cricketGain = this.ctx.createGain();
+        this.cricketGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.setupProceduralCrickets(this.cricketGain);
+
+        this.isPlaying = true;
+        this.updateSynthLevels(35); // Default to low intensity
+      }
+
+      setupNoiseWind(gainNode, baseFreq) {
+        const bufferSize = 2 * this.ctx.sampleRate;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = baseFreq;
+        filter.Q.value = 1.5;
+
+        // Modulate filter freq to simulate breathing gust waves
+        const lfo = this.ctx.createOscillator();
+        lfo.frequency.value = 0.15; // ultra slow waves
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 45;
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(filter.frequency);
+        lfo.start();
+
+        whiteNoise.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+        whiteNoise.start();
+      }
+
+      setupProceduralCrickets(gainNode) {
+        // High-frequency synth chirps triggering on intervals
+        const triggerChirp = () => {
+          if (!this.isPlaying) return;
+          const osc = this.ctx.createOscillator();
+          const amp = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(4500, this.ctx.currentTime);
+
+          // Fast frequency modulation to produce cricket "shiver" pitch
+          const fm = this.ctx.createOscillator();
+          fm.frequency.value = 65;
+          const fmGain = this.ctx.createGain();
+          fmGain.gain.value = 350;
+          fm.connect(fmGain);
+          fmGain.connect(osc.frequency);
+          fm.start();
+
+          amp.gain.setValueAtTime(0, this.ctx.currentTime);
+          amp.gain.linearRampToValueAtTime(0.015, this.ctx.currentTime + 0.05);
+          amp.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.25);
+
+          osc.connect(amp);
+          amp.connect(gainNode);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.3);
+
+          setTimeout(triggerChirp, 1500 + Math.random() * 2000);
+        };
+        gainNode.connect(this.ctx.destination);
+        triggerChirp();
+      }
+
+      updateSynthLevels(intensity) {
+        if (!this.ctx || !this.isPlaying) return;
+        const volume = intensity / 100;
+        this.windGain.gain.setTargetAtTime(0.12 * volume, this.ctx.currentTime, 0.5);
+        this.cricketGain.gain.setTargetAtTime(0.18, this.ctx.currentTime, 0.5);
+      }
+
+      mute() {
+        if (this.windGain) this.windGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+        if (this.cricketGain) this.cricketGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+        this.isPlaying = false;
+      }
+    }
+
+    const natureSynth = new AtmosphericAudioSynth();
+
+    // --- STREAMING_CHUNK: Shader Materials Core ---
+    // CUSTOM SHADER FOR GRASS: Color Gradients, Translucency Backscattering, Procedural Dual-Frequency Wind Bending
+    const grassVertexShader = `
+      uniform float uTime;
+      uniform float uWindSpeed;
+      uniform float uWindStrength;
+      uniform vec3 uSunPos;
+      
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      varying vec3 vWorldPos;
+      varying float vHeight;
+
+      // Simple procedural hash function to offset instances
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      void main() {
+        // Retrieve absolute instance translation directly from the instance matrix
+        vec3 instPos = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+        
+        // vHeight: normalized vertical axis height of each grass leaf segment (y maps to length)
+        vHeight = position.y / 0.55; 
+
+        // Generate static unique direction angle using instance coordinates
+        float offsetAngle = hash(instPos.xz) * 3.14159 * 2.0;
+        float segmentFactor = pow(vHeight, 2.0); // bending is exponential toward tips
+
+        // Dual-frequency procedural wind algorithm: Wave + Rustle details
+        float waveFreq = uTime * uWindSpeed + instPos.x * 0.18 + instPos.z * 0.15;
+        float macroWave = sin(waveFreq) * cos(waveFreq * 0.45) * 0.16 * uWindStrength;
+        float microRustle = sin(uTime * 12.0 + instPos.y * 5.0) * 0.015 * uWindStrength;
+
+        // Apply spatial bend offsets
+        vec3 localPosition = position;
+        localPosition.x += (sin(offsetAngle) * 0.05 + macroWave + microRustle) * segmentFactor;
+        localPosition.z += (cos(offsetAngle) * 0.05 + macroWave * 0.8) * segmentFactor;
+
+        // Apply standard instance transforms
+        vec4 worldPos = modelMatrix * instanceMatrix * vec4(localPosition, 1.0);
+        vWorldPos = worldPos.xyz;
+
+        vec4 mvPosition = viewMatrix * worldPos;
+        gl_Position = projectionMatrix * mvPosition;
+
+        // Pass lighting coordinates to Fragment stage
+        vNormal = normalize(normalMatrix * (instanceMatrix * vec4(normal, 0.0)).xyz);
+        vViewPosition = -mvPosition.xyz;
+      }
+    `;
+
+    const grassFragmentShader = `
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      varying vec3 vWorldPos;
+      varying float vHeight;
+
+      uniform vec3 uSunPos;
+      uniform vec3 uGrassColorBottom;
+      uniform vec3 uGrassColorTip;
+      uniform vec3 uSunColor;
+
+      void main() {
+        // Base procedural color gradient: dark wet soil humus up to vibrant sunlit grass tips
+        vec3 baseColor = mix(uGrassColorBottom, uGrassColorTip, vHeight);
+
+        // Normalize direction normals
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+        vec3 lightDir = normalize(uSunPos - vWorldPos);
+
+        // Basic Lambertian diffuse shading
+        float diffuse = max(0.0, dot(normal, lightDir));
+
+        // Subsurface backscattering glow: simulating the golden light filtering through translucent leaf tissue
+        float backscattering = max(0.0, dot(lightDir, -viewDir));
+        float translucentGlow = pow(backscattering, 3.5) * vHeight * 0.75;
+
+        // Assemble beautiful layered colors
+        vec3 finalColor = baseColor * (diffuse * 0.75 + 0.35); // Ambient bleed
+        finalColor += uSunColor * translucentGlow; // Glow highlight overlay
+
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    // --- STREAMING_CHUNK: Interactive Setup Variables ---
+    // Scene variables
+    let scene, camera, renderer, controls;
+    let grassInstances, flowerInstances, lavenderInstances;
+    let sunRaysGroup, lightDust;
+    let directionalLight, ambientLight, hemisphereLight;
+    let backgroundTrees = [];
+    let activeCameraPath = 'orbit'; // orbit, low, dolly, manual
+    let isCinematicPlaying = true;
+    let pathTimer = 0;
+    let systemClock = new THREE.Clock();
+
+    // Environment Lighting State Configurations (Based on image_203d60.jpg)
+    const envPresets = {
+      golden: {
+        skyColor: 0x22130e,
+        fogColor: 0x3d2011,
+        ambientColor: 0x47230c,
+        sunColor: 0xffaa44,
+        sunIntensity: 2.2,
+        bottomColor: new THREE.Color(0x0e2009), // Dark green shadow
+        tipColor: new THREE.Color(0x8bc34a),    // Glowing golden-lime green
+        sunPos: new THREE.Vector3(35, 14, -40)
+      },
+      overcast: {
+        skyColor: 0x242d38,
+        fogColor: 0x303c4c,
+        ambientColor: 0x1f2c3d,
+        sunColor: 0x90a4ae,
+        sunIntensity: 0.9,
+        bottomColor: new THREE.Color(0x09140c),
+        tipColor: new THREE.Color(0x4caf50),
+        sunPos: new THREE.Vector3(15, 30, -20)
+      },
+      midday: {
+        skyColor: 0xb3e5fc,
+        fogColor: 0xe1f5fe,
+        ambientColor: 0x64b5f6,
+        sunColor: 0xffffff,
+        sunIntensity: 2.5,
+        bottomColor: new THREE.Color(0x061405),
+        tipColor: new THREE.Color(0x66bb6a),
+        sunPos: new THREE.Vector3(10, 50, 10)
+      },
+      autumn: {
+        skyColor: 0x3e2723,
+        fogColor: 0x5d4037,
+        ambientColor: 0x4e342e,
+        sunColor: 0xff9100,
+        sunIntensity: 1.8,
+        bottomColor: new THREE.Color(0x131206),
+        tipColor: new THREE.Color(0xd4af37),
+        sunPos: new THREE.Vector3(40, 16, -30)
+      }
+    };
+
+    let activePreset = envPresets.golden;
+
+    // Grass shader uniform definitions
+    const grassUniforms = {
+      uTime: { value: 0 },
+      uWindSpeed: { value: 1.5 },
+      uWindStrength: { value: 0.8 },
+      uSunPos: { value: activePreset.sunPos },
+      uGrassColorBottom: { value: activePreset.bottomColor },
+      uGrassColorTip: { value: activePreset.tipColor },
+      uSunColor: { value: new THREE.Color(activePreset.sunColor) }
+    };
+
+    // --- STREAMING_CHUNK: Engine Initialisation ---
+    function initViewer3D() {
+      const container = document.getElementById('gardenCanvas');
+      scene = new THREE.Scene();
+      
+      // Warm volumetric fog
+      scene.background = new THREE.Color(activePreset.skyColor);
+      scene.fog = new THREE.FogExp2(activePreset.fogColor, 0.015);
+
+      // Camera config - Start close to grass
+      camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 800);
+      camera.position.set(8, 2, 12);
+
+      // WebGL Renderer settings
+      renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+
+      // Orbit controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.enableZoom = true;
+      controls.enablePan = true;
+      controls.zoomSpeed = 2;
+      controls.minDistance = 0.1;
+      controls.maxDistance = 100;
+      controls.maxPolarAngle = Math.PI / 2.05; // Lock camera from going below grass floor
+
+      // Auto-focus canvas for zoom to work in iframe
+      setTimeout(() => {
+        renderer.domElement.tabIndex = 1;
+        renderer.domElement.focus();
+        renderer.domElement.style.outline = 'none';
+      }, 100);
+
+      // Create environment light setup
+      hemisphereLight = new THREE.HemisphereLight(0xfff0dd, 0x1f5c15, 0.4);
+      scene.add(hemisphereLight);
+
+      ambientLight = new THREE.AmbientLight(activePreset.ambientColor, 0.6);
+      scene.add(ambientLight);
+
+      directionalLight = new THREE.DirectionalLight(activePreset.sunColor, activePreset.sunIntensity);
+      directionalLight.position.copy(activePreset.sunPos);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      directionalLight.shadow.bias = -0.0004;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 150;
+      const shadowFrustumSize = 35;
+      directionalLight.shadow.camera.left = -shadowFrustumSize;
+      directionalLight.shadow.camera.right = shadowFrustumSize;
+      directionalLight.shadow.camera.top = shadowFrustumSize;
+      directionalLight.shadow.camera.bottom = -shadowFrustumSize;
+      scene.add(directionalLight);
+
+      // Build Scenic Lawn & Garden Setup
+      buildScenicGarden();
+
+      // UI Load progression complete trigger
+      setTimeout(() => {
+        document.getElementById('cinematic-loader').style.opacity = '0';
+        document.getElementById('cinema-hud').style.opacity = '1';
+        setTimeout(() => {
+          document.getElementById('cinematic-loader').style.display = 'none';
+        }, 1500);
+      }, 1800);
+
+      window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- STREAMING_CHUNK: Landscape Building ---
+    // Scene architecture recreation of beautiful landscaping image_203d60.jpg
+    function buildScenicGarden() {
+      const pBar = document.getElementById('load-progress-bar');
+      const updateProgress = (pct) => { pBar.style.width = pct + '%'; };
+
+      // Base rich green organic soil floor
+      const groundGeo = new THREE.PlaneGeometry(120, 120, 24, 24);
+      // Create organic minor bumps in base soil mesh
+      const posAttr = groundGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        const z = posAttr.getZ(i) + (Math.sin(x * 0.25) * Math.cos(y * 0.25) * 0.2);
+        posAttr.setZ(i, z);
+      }
+      groundGeo.computeVertexNormals();
+
+      const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x0a1405, // deep wet moss green
+        roughness: 0.95,
+        metalness: 0.05
+      });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+      updateProgress(20);
+
+      // 1. Compile and Render the Ultra-Realistic Instanced Grass Canopy
+      generateInstancedGardenGrass();
+      updateProgress(50);
+
+      // 2. Generate layered backdrop vegetation matching image_203d60.jpg
+      buildForestBackgroundLayer();
+      updateProgress(75);
+
+      // 3. Volumetric sun beams filtering through dense trees
+      buildVolumetricSunrays();
+
+      // 4. Floating warm dust particle system
+      buildSunDustMotes();
+      updateProgress(100);
+    }
+
+    // --- STREAMING_CHUNK: High-Density Grass Generation ---
+    function generateInstancedGardenGrass() {
+      // Shape of organic grass blade geometry: tapering segmented strip
+      const bladeGeo = new THREE.ConeGeometry(0.04, 0.55, 3, 3);
+      bladeGeo.translate(0, 0.275, 0); // Center anchor pivot onto bottom floor level
+
+      const grassCount = 35000; // High density to create solid green canopy carpet
+      const grassMat = new THREE.ShaderMaterial({
+        vertexShader: grassVertexShader,
+        fragmentShader: grassFragmentShader,
+        uniforms: grassUniforms,
+        side: THREE.DoubleSide
+      });
+
+      grassInstances = new THREE.InstancedMesh(bladeGeo, grassMat, grassCount);
+      grassInstances.castShadow = true;
+      grassInstances.receiveShadow = true;
+
+      const dummy = new THREE.Object3D();
+      const densityAreaSize = 35; // Size of grass center meadow lawn
+
+      for (let i = 0; i < grassCount; i++) {
+        // Place dynamically avoiding background flower & forest sectors
+        const x = (Math.random() - 0.5) * densityAreaSize;
+        const z = (Math.random() - 0.5) * densityAreaSize + 2; // offset forward slightly
+
+        // Vary height scales dynamically to ensure textured, realistic garden look
+        const heightScale = 0.7 + Math.random() * 0.6;
+        const widthScale = 0.8 + Math.random() * 0.5;
+
+        dummy.position.set(x, 0.0, z);
+        dummy.rotation.set(
+          (Math.random() - 0.5) * 0.15, // minor organic tilt
+          Math.random() * Math.PI,
+          (Math.random() - 0.5) * 0.15
+        );
+        dummy.scale.set(widthScale, heightScale, widthScale);
+        dummy.updateMatrix();
+
+        grassInstances.setMatrixAt(i, dummy.matrix);
+      }
+      scene.add(grassInstances);
+    }
+
+    // --- STREAMING_CHUNK: Forest & Flowers Composition ---
+    // Procedurally recreates the stunning layered tree canopy and flowerbeds of image_203d60.jpg
+    function buildForestBackgroundLayer() {
+      // Background dense trees (placed along back boundary z = -20 to -35)
+      const treeCount = 45;
+      const treeGroup = new THREE.Group();
+
+      const foliageMatGreen = new THREE.MeshLambertMaterial({ color: 0x184c1b, flatShading: true });
+      const foliageMatYellow = new THREE.MeshLambertMaterial({ color: 0x8a921d, flatShading: true });
+      const foliageMatRed = new THREE.MeshLambertMaterial({ color: 0xb52424, flatShading: true }); // Iconic Maple in image_203d60.jpg
+      const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3d2314 });
+
+      const trunkGeo = new THREE.CylinderGeometry(0.18, 0.35, 4.5, 6);
+      const canopyGeo = new THREE.DodecahedronGeometry(2.4, 1);
+
+      for (let i = 0; i < treeCount; i++) {
+        const singleTree = new THREE.Group();
+
+        // Position: Create a dense curved background forest boundary
+        const theta = (i / treeCount) * Math.PI - Math.PI / 2;
+        const radius = 28 + Math.random() * 8;
+        const x = Math.sin(theta) * radius;
+        const z = -Math.cos(theta) * radius - 8;
+
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 2.25;
+        trunk.castShadow = true;
+        singleTree.add(trunk);
+
+        // Mix foliage colors: Deep green left, Golden yellow center gaps, Japanese Red Maples on the right!
+        let activeFoliageMat = foliageMatGreen;
+        if (x > 8) {
+          activeFoliageMat = foliageMatRed; // Beautiful red accents on right of image_203d60.jpg
+        } else if (Math.abs(x) < 4) {
+          activeFoliageMat = foliageMatYellow; // Golden sunset catcher center trees
+        }
+
+        const canopy = new THREE.Mesh(canopyGeo, activeFoliageMat);
+        canopy.position.y = 5.2;
+        // Scaled to look organic
+        const scale = 0.8 + Math.random() * 0.7;
+        canopy.scale.set(scale, scale * 1.3, scale);
+        canopy.castShadow = true;
+        singleTree.add(canopy);
+
+        singleTree.position.set(x, -0.2, z);
+        treeGroup.add(singleTree);
+        backgroundTrees.push(singleTree); // save references to sway gently
+      }
+      scene.add(treeGroup);
+
+      // 2. LAYERED FLOWERBEDS: Purple Lavender spikes & Yellow Marigold sphere beds lining forest front
+      const flowerCount = 600;
+      const flowerGeo = new THREE.SphereGeometry(0.12, 4, 4);
+      const yellowMat = new THREE.MeshLambertMaterial({ color: 0xfbc02d });
+      const purpleMat = new THREE.MeshLambertMaterial({ color: 0x7e57c2 });
+
+      flowerInstances = new THREE.InstancedMesh(flowerGeo, yellowMat, flowerCount);
+      lavenderInstances = new THREE.InstancedMesh(flowerGeo, purpleMat, flowerCount);
+
+      flowerInstances.castShadow = true;
+      lavenderInstances.castShadow = true;
+
+      const d = new THREE.Object3D();
+      for (let i = 0; i < flowerCount; i++) {
+        // Place along curved boundary in front of backdrop forest (z = -12 to -18)
+        const angle = (i / flowerCount) * Math.PI - Math.PI / 2;
+        const r = 16 + Math.random() * 5;
+        const fx = Math.sin(angle) * r;
+        const fz = -Math.cos(angle) * r - 4;
+
+        // Yellow Marigolds (Layer A)
+        d.position.set(fx, 0.15 + Math.random() * 0.2, fz);
+        d.scale.setScalar(0.7 + Math.random() * 0.6);
+        d.updateMatrix();
+        flowerInstances.setMatrixAt(i, d.matrix);
+
+        // Purple Lavenders (Layer B, slightly offset)
+        d.position.set(fx + (Math.random() - 0.5) * 2, 0.22 + Math.random() * 0.3, fz + 1.5);
+        d.scale.set(0.6, 1.8 + Math.random() * 1.5, 0.6); // tall spikes
+        d.updateMatrix();
+        lavenderInstances.setMatrixAt(i, d.matrix);
+      }
+      scene.add(flowerInstances, lavenderInstances);
+    }
+
+    // --- STREAMING_CHUNK: Atmospheric FX Setup ---
+    // Volumetric volumetric light shafts radiating from the low sun position
+    function buildVolumetricSunrays() {
+      sunRaysGroup = new THREE.Group();
+      
+      const beamGeo = new THREE.CylinderGeometry(0.1, 4.5, 30, 8, 1, true);
+      beamGeo.translate(0, 15, 0); // shift pivot to apex of cone
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: 0xffe0b2,
+        transparent: true,
+        opacity: 0.12,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      // Spawn angled cones pointing down toward the meadow grass lawn
+      for (let i = 0; i < 6; i++) {
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        beam.position.copy(activePreset.sunPos);
+        
+        // Pivot angles looking toward the ground center
+        beam.lookAt(new THREE.Vector3((i - 2.5) * 5, 0, (Math.random() - 0.5) * 6));
+        beam.rotateX(Math.PI / 2); // Cylinder alignment adjustment
+        
+        // Vary rays scale
+        beam.scale.set(0.8 + Math.random() * 0.4, 1.0, 0.8 + Math.random() * 0.4);
+        sunRaysGroup.add(beam);
+      }
+      scene.add(sunRaysGroup);
+    }
+
+    // Floating light dust particles floating through golden sun shafts
+    function buildSunDustMotes() {
+      const dustCount = 350;
+      const dustGeo = new THREE.BufferGeometry();
+      const posArray = new Float32Array(dustCount * 3);
+      const speeds = [];
+
+      for (let i = 0; i < dustCount * 3; i += 3) {
+        posArray[i] = (Math.random() - 0.5) * 45;       // X
+        posArray[i + 1] = 0.2 + Math.random() * 12;     // Y
+        posArray[i + 2] = (Math.random() - 0.5) * 45;   // Z
+        speeds.push({
+          x: (Math.random() - 0.5) * 0.15,
+          y: -0.05 - Math.random() * 0.1,
+          z: (Math.random() - 0.5) * 0.15
+        });
+      }
+
+      dustGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      const dustMat = new THREE.PointsMaterial({
+        color: 0xffecb3,
+        size: 0.12,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending
+      });
+
+      lightDust = new THREE.Points(dustGeo, dustMat);
+      lightDust.userData = { speeds: speeds };
+      scene.add(lightDust);
+    }
+
+    // --- STREAMING_CHUNK: Main Animation Render Frame ---
+    function animateCinematicScene() {
+      requestAnimationFrame(animateCinematicScene);
+
+      const delta = systemClock.getDelta();
+      const elapsedTime = systemClock.getElapsedTime();
+
+      // 1. Pass elapsed system timeline to custom grass shaders
+      grassUniforms.uTime.value = elapsedTime;
+
+      // 2. Slow organic tree canopy sway
+      backgroundTrees.forEach((tree, idx) => {
+        tree.rotation.z = Math.sin(elapsedTime * 0.75 + idx) * 0.015 * (grassUniforms.uWindStrength.value);
+        tree.rotation.x = Math.cos(elapsedTime * 0.55 + idx) * 0.012 * (grassUniforms.uWindStrength.value);
+      });
+
+      // 3. Floating Dust Particles motion
+      if (lightDust) {
+        const positions = lightDust.geometry.attributes.position.array;
+        const s = lightDust.userData.speeds;
+        for (let i = 0; i < s.length; i++) {
+          positions[i * 3] += s[i].x * delta;
+          positions[i * 3 + 1] += s[i].y * delta;
+          positions[i * 3 + 2] += s[i].z * delta;
+
+          // Recycle dust particles when dipping below floor
+          if (positions[i * 3 + 1] < 0.15) {
+            positions[i * 3] = (Math.random() - 0.5) * 45;
+            positions[i * 3 + 1] = 8.5 + Math.random() * 4;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 45;
+          }
+        }
+        lightDust.geometry.attributes.position.needsUpdate = true;
+      }
+
+      // 4. Resolve camera tracking sweeps
+      runCameraTrackingRail(elapsedTime);
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // --- STREAMING_CHUNK: Camera Rail Tracking Engine ---
+    // Automated camera tracking sweeps that mirror pro videography sliders
+    function runCameraTrackingRail(time) {
+      if (!isCinematicPlaying) return;
+
+      if (activeCameraPath === 'orbit') {
+        // Slow cinematic panoramic rotation around center lawn
+        const radius = 24;
+        const speed = 0.06;
+        camera.position.x = Math.sin(time * speed) * radius;
+        camera.position.z = Math.cos(time * speed) * radius;
+        camera.position.y = 4.5 + Math.sin(time * 0.1) * 2.0; // slight crane rise
+        camera.lookAt(new THREE.Vector3(0, 1.2, -4));
+
+      } else if (activeCameraPath === 'low') {
+        // Slow horizontal slider macro sweep through grass tips
+        const startX = -12;
+        const slideRange = 24;
+        const cycle = (time * 0.05) % 1.0;
+        
+        camera.position.x = startX + cycle * slideRange;
+        camera.position.z = 10;
+        camera.position.y = 0.65 + Math.sin(time * 0.15) * 0.15; // grass level
+        camera.lookAt(new THREE.Vector3(camera.position.x + 2, 0.55, -6));
+
+      } else if (activeCameraPath === 'dolly') {
+        // High canopy tilt and downward pan
+        camera.position.x = 14;
+        camera.position.z = 18;
+        camera.position.y = 12.0 - Math.min(6.0, time * 0.25); // slow boom crane drop
+        camera.lookAt(new THREE.Vector3(0, 2.5, -12));
+      }
+    }
+
+    // --- STREAMING_CHUNK: Visual Presets Config ---
+    function applyLightingPreset(presetName) {
+      activePreset = envPresets[presetName];
+
+      // Morph Sky backgrounds & fog colors smoothly
+      scene.background.setHex(activePreset.skyColor);
+      scene.fog.color.setHex(activePreset.fogColor);
+      scene.fog.density = 0.015;
+
+      ambientLight.color.setHex(activePreset.ambientColor);
+      directionalLight.color.setHex(activePreset.sunColor);
+      directionalLight.intensity = activePreset.sunIntensity;
+      directionalLight.position.copy(activePreset.sunPos);
+
+      // Re-map shader uniform variables for rim lighting formulas
+      grassUniforms.uSunPos.value = activePreset.sunPos;
+      grassUniforms.uGrassColorBottom.value = activePreset.bottomColor;
+      grassUniforms.uGrassColorTip.value = activePreset.tipColor;
+      grassUniforms.uSunColor.value = new THREE.Color(activePreset.sunColor);
+
+      // Align physical volumetric beams directly with updated sun coordinates
+      if (sunRaysGroup) {
+        sunRaysGroup.children.forEach((beam, i) => {
+          beam.position.copy(activePreset.sunPos);
+          beam.lookAt(new THREE.Vector3((i - 2.5) * 5, 0, (Math.random() - 0.5) * 6));
+          beam.rotateX(Math.PI / 2);
+        });
+      }
+    }
+
+    // --- STREAMING_CHUNK: User Dashboard Logic ---
+    function setupCinematicUI() {
+      // Setup Audio Synthesizer toggle button
+      const volBtn = document.getElementById('synth-vol-btn');
+      volBtn.addEventListener('click', () => {
+        natureSynth.init();
+        if (natureSynth.isPlaying) {
+          natureSynth.mute();
+          volBtn.innerHTML = `<i class="fa-solid fa-volume-xmark text-sm"></i>`;
+          volBtn.classList.remove('text-amber-400');
+        } else {
+          natureSynth.isPlaying = true;
+          natureSynth.updateSynthLevels(parseFloat(document.getElementById('wind-slider').value));
+          volBtn.innerHTML = `<i class="fa-solid fa-volume-high text-sm text-amber-400"></i>`;
+          volBtn.classList.add('text-amber-400');
+        }
+      });
+
+      // Lighting Presets hooks
+      const presets = ['golden', 'overcast', 'midday', 'autumn'];
+      presets.forEach(p => {
+        document.getElementById(`preset-${p}`).addEventListener('click', (e) => {
+          applyLightingPreset(p);
+          
+          // Clear styles and apply focus highlighting
+          presets.forEach(x => {
+            const btn = document.getElementById(`preset-${x}`);
+            btn.className = "bg-neutral-900 border border-transparent hover:border-white/10 py-2 rounded-xl text-xs font-medium text-slate-300 transition-all";
+          });
+          e.target.className = "bg-amber-500/10 border border-amber-500/40 py-2 rounded-xl text-xs font-medium text-amber-400 transition-all hover:bg-amber-500/15";
+          
+          // Custom angle label updates
+          let angleLbl = 'Midday high';
+          if (p === 'golden') angleLbl = 'Sunset Sunset';
+          if (p === 'autumn') angleLbl = 'Low amber sun';
+          if (p === 'overcast') angleLbl = 'Diffuse cloud sky';
+          document.getElementById('light-angle-val').innerText = angleLbl;
+        });
+      });
+
+      // Live Sun Angle Position Slider edit
+      document.getElementById('sun-angle-slider').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        const rad = (val / 180) * Math.PI;
+        
+        // Reposition Solar directional coordinates
+        activePreset.sunPos.set(Math.cos(rad) * 45, Math.sin(rad) * 20 + 2, -30);
+        directionalLight.position.copy(activePreset.sunPos);
+        grassUniforms.uSunPos.value = activePreset.sunPos;
+        
+        document.getElementById('light-angle-val').innerText = `${val}° Elevation`;
+      });
+
+      // Wind slider velocity tweaking
+      document.getElementById('wind-slider').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        grassUniforms.uWindSpeed.value = 0.5 + (val / 100) * 3.5;
+        grassUniforms.uWindStrength.value = (val / 100) * 1.5;
+
+        let label = 'Gentle Breeze';
+        if (val === 0) label = 'Dead Calm';
+        else if (val > 70) label = 'Gale gusts';
+        else if (val > 40) label = 'Lush Sweep';
+        document.getElementById('wind-strength-val').innerText = label;
+
+        // Propagate real-time value to background Web Audio generators
+        if (natureSynth.isPlaying) {
+          natureSynth.updateSynthLevels(val);
+        }
+      });
+
+      // Cinematic Camera rail pathing options
+      const cameraPaths = ['orbit', 'low', 'dolly', 'manual'];
+      cameraPaths.forEach(path => {
+        document.getElementById(`track-${path}`).addEventListener('click', (e) => {
+          activeCameraPath = path;
+
+          // Style resets
+          cameraPaths.forEach(x => {
+            const btn = document.getElementById(`track-${x}`);
+            btn.className = "w-full text-left hover:bg-white/5 px-3 py-2 rounded-xl flex items-center justify-between";
+            const badge = btn.querySelector('span:last-child');
+            if (badge) badge.className = "text-[9px] px-1.5 py-0.5 bg-white/10 rounded";
+          });
+
+          // Set active accent
+          const currentBtn = document.getElementById(`track-${path}`);
+          currentBtn.className = "w-full text-left bg-amber-500/10 border border-amber-500/30 px-3 py-2 rounded-xl flex items-center justify-between text-amber-400";
+          const currentBadge = currentBtn.querySelector('span:last-child');
+          if (currentBadge) currentBadge.className = "text-[9px] px-1.5 py-0.5 bg-amber-400/20 rounded text-amber-300";
+
+          if (path === 'manual') {
+            isCinematicPlaying = false;
+            controls.enabled = true;
+            document.getElementById('camera-mode-label').innerText = "FREE ORBIT ENABLED";
+            document.getElementById('shutter-speed-display').innerText = "Manual";
+          } else {
+            isCinematicPlaying = true;
+            controls.enabled = false;
+            document.getElementById('camera-mode-label').innerText = "CAM TRACKING ACTIVATED";
+            document.getElementById('shutter-speed-display').innerText = "1.5x";
+          }
+        });
+      });
+
+      // Quick cinematic toggle play/pause track button
+      document.getElementById('cinematic-play-btn').addEventListener('click', () => {
+        isCinematicPlaying = !isCinematicPlaying;
+        const lbl = document.getElementById('camera-mode-label');
+        if (isCinematicPlaying) {
+          lbl.innerText = "CAM TRACKING ACTIVATED";
+          controls.enabled = false;
+        } else {
+          lbl.innerText = "CINEMATIC RAIL LOCKED";
+          controls.enabled = true;
+        }
+      });
+    }
+
+    // --- STREAMING_CHUNK: Window Loading Boot ---
+    window.onload = () => {
+      initViewer3D();
+      animateCinematicScene();
+      setupCinematicUI();
+      
+      // Hide/Show HUD Toggle
+      let uiVisible = true;
+      const hideBtn = document.getElementById('btn-hide-ui');
+      const cinemaHud = document.getElementById('cinema-hud');
+      
+      hideBtn.addEventListener('click', () => {
+        uiVisible = !uiVisible;
+        if (uiVisible) {
+          cinemaHud.style.opacity = '1';
+          hideBtn.innerHTML = '<i class="fa-solid fa-eye-slash text-sm"></i>';
+          hideBtn.classList.remove('text-cyan-400');
+          hideBtn.classList.add('text-amber-400');
+        } else {
+          cinemaHud.style.opacity = '0';
+          hideBtn.innerHTML = '<i class="fa-solid fa-eye text-sm"></i>';
+          hideBtn.classList.remove('text-amber-400');
+          hideBtn.classList.add('text-cyan-400');
+        }
+      });
+    };
+
+  </script>
+</body>
+</html>

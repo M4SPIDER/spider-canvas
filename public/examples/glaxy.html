@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Galaxy Engine - 3D Simulation</title>
+    <!-- Tailwind CSS for sleek sci-fi interfaces -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for futuristic interface icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+        
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020208;
+            color: #e2e8f0;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+
+        .orbitron-font {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+
+        /* Glassmorphism custom design */
+        .glass-panel {
+            background: rgba(10, 10, 25, 0.65);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(138, 43, 226, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+
+        .glass-panel-active {
+            border: 1px solid rgba(0, 210, 255, 0.6);
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+        }
+
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(10, 10, 25, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(138, 43, 226, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 210, 255, 0.6);
+        }
+
+
+        /* Custom Range Slider Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: rgba(138, 43, 226, 0.15);
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00d2ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00d2ff;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #bf5eff;
+            box-shadow: 0 0 14px #bf5eff;
+        }
+
+
+        /* Ambient glowing button effects */
+        .btn-glow {
+            transition: all 0.3s ease;
+        }
+        .btn-glow:hover {
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.5);
+            text-shadow: 0 0 5px rgba(0, 210, 255, 0.8);
+        }
+
+
+        /* Hyperspace motion blur active style overlay */
+        #warp-overlay {
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 1.2s cubic-bezier(0.1, 0.8, 0.25, 1);
+            background: radial-gradient(circle, transparent 40%, rgba(138, 43, 226, 0.15) 80%, rgba(0, 210, 255, 0.3) 100%);
+        }
+
+
+        .nebula-tooltip {
+            pointer-events: none;
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body class="relative min-h-screen select-none">
+
+
+    <!-- Loading Screen Overlay -->
+    <div id="loading-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#010105] transition-opacity duration-1000">
+        <div class="relative w-48 h-48 mb-8 flex items-center justify-center">
+            <!-- Pulsing/Rotating rings -->
+            <div class="absolute inset-0 border-4 border-t-cyan-400 border-r-purple-600 border-b-transparent border-l-transparent rounded-full animate-spin" style="animation-duration: 1.5s;"></div>
+            <div class="absolute inset-4 border-2 border-b-purple-500 border-l-cyan-400 border-t-transparent border-r-transparent rounded-full animate-spin" style="animation-duration: 2.5s; animation-direction: reverse;"></div>
+            <div class="absolute inset-8 bg-gradient-to-tr from-purple-900 to-black rounded-full flex items-center justify-center">
+                <i class="fa-solid fa-atom text-cyan-400 text-3xl animate-pulse"></i>
+            </div>
+        </div>
+        <h1 class="orbitron-font text-2xl font-bold tracking-[0.4em] text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-200 to-purple-500 uppercase">
+            Initializing Engine
+        </h1>
+        <p class="text-xs text-purple-400/80 tracking-widest mt-2 uppercase">Procedural Cosmic Mesh Constructor</p>
+    </div>
+
+
+    <!-- WebGL Render Canvas -->
+    <canvas id="galaxy-canvas" class="absolute inset-0 w-full h-full block z-0"></canvas>
+    
+    <!-- Cinematic Speed Overlay -->
+    <div id="warp-overlay" class="absolute inset-0 w-full h-full z-10"></div>
+
+    <!-- FLOATING HIDE/SHOW BUTTON - Always visible at top -->
+    <button id="btn-floating-hide" class="fixed top-4 right-4 z-50 glass-panel btn-glow text-yellow-400 hover:text-white w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer" title="Hide/Show All UI">
+        <i class="fa-solid fa-eye-slash text-lg"></i>
+    </button>
+
+    <!-- MAIN HUD UI OVERLAY -->
+    <div id="hud-container" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-4 md:p-6 select-none transition-opacity duration-300">
+        
+        <!-- Header Banner -->
+        <header class="w-full flex justify-between items-start pointer-events-auto">
+            <div class="glass-panel p-4 rounded-xl flex flex-col gap-1 max-w-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                    <h1 class="orbitron-font text-lg font-bold uppercase tracking-wider text-white">Galaxy Engine v3.8</h1>
+                </div>
+                <p class="text-xs text-slate-400">Interact with the cosmic dust to explore the structures of procedural stellar creation.</p>
+            </div>
+
+
+            <!-- Header Quick Actions (Audio / Reset / Help / Hide HUD) -->
+            <div class="flex gap-2">
+                <button id="btn-hide-hud" class="glass-panel btn-glow text-yellow-400 hover:text-white w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer pointer-events-auto" title="Hide/Show UI">
+                    <i class="fa-solid fa-eye-slash text-lg"></i>
+                </button>
+                <button id="btn-audio" class="glass-panel btn-glow text-cyan-400 hover:text-white w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer pointer-events-auto" title="Synthesizer Ambient Engine">
+                    <i id="audio-icon" class="fa-solid fa-volume-xmark text-lg"></i>
+                </button>
+                <button id="btn-reset-cam" class="glass-panel btn-glow text-cyan-400 hover:text-white w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer pointer-events-auto" title="Recenter Observatory Camera">
+                    <i class="fa-solid fa-crosshairs text-lg"></i>
+                </button>
+                <button id="btn-info" class="glass-panel btn-glow text-purple-400 hover:text-white w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer pointer-events-auto" title="Observatory Logbook">
+                    <i class="fa-solid fa-circle-info text-lg"></i>
+                </button>
+            </div>
+        </header>
+
+
+        <!-- Dynamic Middle Layer (Left Side Panel, Right Telemetry) -->
+        <div class="flex-grow my-4 flex flex-col md:flex-row justify-between items-end md:items-stretch gap-4 overflow-hidden">
+            
+            <!-- Parameters Control Terminal (Left Panel) -->
+            <aside id="controls-terminal" class="glass-panel w-full md:w-80 p-5 rounded-2xl flex flex-col gap-4 overflow-y-auto pointer-events-auto max-h-[70vh] md:max-h-none transition-all duration-300">
+                <div class="flex justify-between items-center border-b border-purple-500/20 pb-3">
+                    <h2 class="orbitron-font text-sm font-bold tracking-widest text-white uppercase"><i class="fa-solid fa-sliders text-cyan-400 mr-2"></i>Galaxy Matrix</h2>
+                    <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 bg-purple-950 text-purple-400 rounded-md border border-purple-800">Procedural</span>
+                </div>
+
+
+                <!-- Presets selection -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Classification Presets</label>
+                    <div class="grid grid-cols-2 gap-1.5 text-xs font-semibold">
+                        <button class="preset-btn bg-purple-950/40 border border-purple-500/20 py-2 px-1 rounded-lg text-center hover:bg-purple-900/40 text-purple-200 transition-all cursor-pointer" data-preset="milky-way">Milky Way</button>
+                        <button class="preset-btn bg-purple-950/40 border border-purple-500/20 py-2 px-1 rounded-lg text-center hover:bg-purple-900/40 text-purple-200 transition-all cursor-pointer" data-preset="andromeda">Andromeda</button>
+                        <button class="preset-btn bg-purple-950/40 border border-purple-500/20 py-2 px-1 rounded-lg text-center hover:bg-purple-900/40 text-purple-200 transition-all cursor-pointer" data-preset="black-hole">Hyper-Core</button>
+                        <button class="preset-btn bg-purple-950/40 border border-purple-500/20 py-2 px-1 rounded-lg text-center hover:bg-purple-900/40 text-purple-200 transition-all cursor-pointer" data-preset="ring">Warped Ring</button>
+                    </div>
+                </div>
+
+
+                <!-- Parameters list -->
+                <div class="flex flex-col gap-4 text-xs">
+                    <!-- Particle Stars Count -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-slate-300 font-medium">
+                            <span class="uppercase tracking-wider">Stellar Count</span>
+                            <span id="val-count" class="orbitron-font text-cyan-400">50,000</span>
+                        </div>
+                        <input type="range" id="param-count" min="10000" max="150000" step="5000" value="70000">
+                    </div>
+
+
+                    <!-- Galaxy Radius -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-slate-300 font-medium">
+                            <span class="uppercase tracking-wider">Outer Bound Radius</span>
+                            <span id="val-radius" class="orbitron-font text-cyan-400">12k ly</span>
+                        </div>
+                        <input type="range" id="param-radius" min="4" max="25" step="0.5" value="13">
+                    </div>
+
+
+                    <!-- Spiral Branches -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-slate-300 font-medium">
+                            <span class="uppercase tracking-wider">Spiral Arm Count</span>
+                            <span id="val-branches" class="orbitron-font text-cyan-400">4</span>
+                        </div>
+                        <input type="range" id="param-branches" min="1" max="12" step="1" value="4">
+                    </div>
+
+
+                    <!-- Spiral Spin -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-slate-300 font-medium">
+                            <span class="uppercase tracking-wider">Arm Spin Angle</span>
+                            <span id="val-spin" class="orbitron-font text-cyan-400">1.8</span>
+                        </div>
+                        <input type="range" id="param-spin" min="-4" max="4" step="0.1" value="1.5">
+                    </div>
+
+
+                    <!-- Star Randomness dispersion -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-slate-300 font-medium">
+                            <span class="uppercase tracking-wider">Arm Scattering</span>
+                            <span id="val-randomness" class="orbitron-font text-cyan-400">0.45</span>
+                        </div>
+                        <input type="range" id="param-randomness" min="0.1" max="1.5" step="0.05" value="0.5">
+                    </div>
+
+
+                    <!-- Rotation Speed multiplier -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-slate-300 font-medium">
+                            <span class="uppercase tracking-wider">Ecliptic Velocity</span>
+                            <span id="val-rotation" class="orbitron-font text-cyan-400">1.0x</span>
+                        </div>
+                        <input type="range" id="param-rotation" min="0" max="4" step="0.05" value="1">
+                    </div>
+                </div>
+
+
+                <!-- Custom Aesthetic Color Pickers -->
+                <div class="flex flex-col gap-2 pt-2 border-t border-purple-500/10">
+                    <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Vector Color Mapping</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="flex flex-col gap-1 text-center bg-black/40 p-1.5 rounded-lg border border-purple-500/15">
+                            <label class="text-[9px] uppercase font-bold text-orange-300">Central</label>
+                            <input type="color" id="color-inside" value="#ffe58f" class="w-full h-5 rounded cursor-pointer border-0 bg-transparent">
+                        </div>
+                        <div class="flex flex-col gap-1 text-center bg-black/40 p-1.5 rounded-lg border border-purple-500/15">
+                            <label class="text-[9px] uppercase font-bold text-pink-400">Nebulous</label>
+                            <input type="color" id="color-middle" value="#ff2a85" class="w-full h-5 rounded cursor-pointer border-0 bg-transparent">
+                        </div>
+                        <div class="flex flex-col gap-1 text-center bg-black/40 p-1.5 rounded-lg border border-purple-500/15">
+                            <label class="text-[9px] uppercase font-bold text-cyan-300">Corona</label>
+                            <input type="color" id="color-outside" value="#00d2ff" class="w-full h-5 rounded cursor-pointer border-0 bg-transparent">
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Interactive Toggles -->
+                <div class="flex flex-col gap-2 mt-auto border-t border-purple-500/10 pt-3">
+                    <button id="btn-cinematic" class="btn-glow flex items-center justify-between text-xs font-bold uppercase tracking-wider py-2.5 px-4 bg-purple-900/20 border border-purple-500/30 rounded-xl hover:bg-purple-950/50 text-purple-300 hover:text-white transition-all cursor-pointer">
+                        <span>Cinematic Pathing</span>
+                        <i id="cinematic-icon" class="fa-solid fa-play text-xs"></i>
+                    </button>
+                    <button id="btn-warp" class="btn-glow flex items-center justify-between text-xs font-bold uppercase tracking-wider py-2.5 px-4 bg-cyan-950/20 border border-cyan-500/30 rounded-xl hover:bg-cyan-950/50 text-cyan-300 hover:text-white transition-all cursor-pointer">
+                        <span>Warp Velocity Shift</span>
+                        <i id="warp-icon" class="fa-solid fa-bolt text-xs"></i>
+                    </button>
+                </div>
+            </aside>
+
+
+            <!-- Diagnostic Real-Time Readout Overlay (Center Right / Mobile Hide) -->
+            <div class="hidden md:flex flex-col justify-between w-64 p-4 text-xs pointer-events-none self-end gap-3">
+                <div class="glass-panel p-4 rounded-xl flex flex-col gap-2 border-r-4 border-r-cyan-400">
+                    <span class="orbitron-font text-[10px] font-bold text-cyan-400 tracking-widest uppercase">System Analytics</span>
+                    <div class="flex justify-between border-b border-white/5 py-1">
+                        <span class="text-slate-400">Simulation Load:</span>
+                        <span id="load-fps" class="font-bold text-white">60 FPS</span>
+                    </div>
+                    <div class="flex justify-between border-b border-white/5 py-1">
+                        <span class="text-slate-400">Glow Particles:</span>
+                        <span id="diag-particles" class="font-bold text-slate-200">50,000</span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-400">Nebulae Nodes:</span>
+                        <span id="diag-nebula" class="font-bold text-slate-200">8,000</span>
+                    </div>
+                </div>
+
+
+                <div class="glass-panel p-4 rounded-xl flex flex-col gap-2 border-r-4 border-r-purple-500">
+                    <span class="orbitron-font text-[10px] font-bold text-purple-400 tracking-widest uppercase">Observatory Log</span>
+                    <div class="flex flex-col gap-1 text-[11px] text-slate-400 leading-relaxed">
+                        <p id="system-log"><i class="fa-solid fa-circle-notch animate-spin mr-1.5 text-cyan-400"></i>Monitoring orbital vectors...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Telemetry Science Dashboard (Bottom Panel) -->
+        <footer class="w-full pointer-events-auto">
+            <div class="glass-panel rounded-2xl p-4 md:px-6 md:py-4 grid grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+                
+                <!-- Telemetry 1: Realtime Distance readout -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-950/40 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                        <i class="fa-solid fa-satellite-dish text-base"></i>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Observatory Distance</span>
+                        <span id="stat-distance" class="orbitron-font text-sm md:text-base font-bold text-white tracking-wide">32,481 Light Years</span>
+                    </div>
+                </div>
+
+
+                <!-- Telemetry 2: Orbit Cycle Duration -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-950/40 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                        <i class="fa-solid fa-rotate text-base"></i>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Orbital Period</span>
+                        <span id="stat-period" class="orbitron-font text-sm md:text-base font-bold text-white tracking-wide">225 Million Years</span>
+                    </div>
+                </div>
+
+
+                <!-- Telemetry 3: Total Stellar Mass -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-950/40 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                        <i class="fa-solid fa-weight-hanging text-base"></i>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Calculated Stellar Mass</span>
+                        <span id="stat-mass" class="orbitron-font text-sm md:text-base font-bold text-white tracking-wide">1.25 Trillion Sol</span>
+                    </div>
+                </div>
+
+
+                <!-- Telemetry 4: Singularity Diameter -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-red-950/40 border border-red-500/20 flex items-center justify-center text-red-400">
+                        <i class="fa-solid fa-circle text-base"></i>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Central Singularity</span>
+                        <span id="stat-singularity" class="orbitron-font text-sm md:text-base font-bold text-white tracking-wide">4.3 Million Sol</span>
+                    </div>
+                </div>
+
+
+            </div>
+        </footer>
+    </div>
+
+
+    <!-- INFORMATION MODAL DIALOG -->
+    <div id="info-modal" class="fixed inset-0 z-40 bg-black/80 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 relative">
+            <button id="btn-close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 class="orbitron-font text-xl font-bold uppercase tracking-widest text-cyan-400 mb-4 border-b border-purple-500/20 pb-2"><i class="fa-solid fa-book-open mr-2"></i>Observatory Archives</h2>
+            <div class="text-xs text-slate-300 leading-relaxed space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                <p>Welcome, Commander. You are observing a fully interactive, procedurally compiled simulation of a spiral galaxy generated directly inside your browser rendering engine.</p>
+                <div class="bg-black/40 border border-purple-500/10 p-3 rounded-lg">
+                    <h3 class="font-bold text-white uppercase mb-1">Navigation Instructions:</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><span class="text-cyan-400">Left Click & Drag:</span> Rotate the telescope angle around the singularity.</li>
+                        <li><span class="text-cyan-400">Right Click & Drag / Two-finger swipe:</span> Pan camera across the cosmic vector plane.</li>
+                        <li><span class="text-cyan-400">Scrollwheel / Pinch Zoom:</span> Move closer or further from the galactic nucleus.</li>
+                    </ul>
+                </div>
+                <div class="bg-black/40 border border-purple-500/10 p-3 rounded-lg">
+                    <h3 class="font-bold text-white uppercase mb-1">Interactive Mechanics:</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><span class="text-cyan-400">Hyper-Core Accretion:</span> Toggle preset templates to configure standard orbital spin patterns or compress simulated star density into a hypermassive central black hole core.</li>
+                        <li><span class="text-cyan-400">Ambient Synthesizer:</span> Activate sound to hear a procedural low-pass frequency sweep reacting in real time to the galaxy's orbital velocity settings!</li>
+                        <li><span class="text-cyan-400">Warp Speed:</span> Engage Warp Velocity to morph normal stars into velocity-stretched speed vectors.</li>
+                    </ul>
+                </div>
+                <p class="text-[10px] text-slate-500">Made possible through high-density coordinate math using customized GPU BufferGeometry rendering buffers to generate up to 150,000 independent star clusters fluidly.</p>
+            </div>
+            <button id="btn-modal-okay" class="mt-6 w-full btn-glow bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 hover:text-white py-2.5 rounded-xl uppercase tracking-wider font-semibold cursor-pointer">
+                Confirm Readings
+            </button>
+        </div>
+    </div>
+
+
+    <!-- SCRIPT DEPENDENCIES AND SIMULATOR CORE -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // Parameters for procedural galaxy creation
+        const parameters = {
+            count: 70000,
+            size: 0.015,
+            radius: 13,
+            branches: 4,
+            spin: 1.5,
+            randomness: 0.45,
+            randomnessPower: 4.2,
+            insideColor: '#ffe58f',
+            middleColor: '#ff2a85',
+            outsideColor: '#00d2ff',
+            rotationSpeed: 0.05,
+            warpSpeedActive: false,
+            cinematicActive: false,
+        };
+
+
+        // Standard Three.js global components
+        let scene, camera, renderer, controls;
+        let galaxyGeometry, galaxyMaterial, galaxyPoints;
+        let nebulaGeometry, nebulaMaterial, nebulaPoints;
+        let blackHole;
+        let isSimRunning = true;
+        let clock;
+
+
+        // Custom Sound synthesis state (Web Audio API)
+        let audioCtx = null;
+        let ambientOsc = null;
+        let ambientFilter = null;
+        let droneGain = null;
+        let isAudioPlaying = false;
+
+
+        // Telemetry Elements
+        const stats = {
+            fps: 60,
+            frameTime: 0,
+            lastFrame: performance.now(),
+        };
+
+
+        // Initialize App on DOM Loaded
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.add('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('loading-screen').classList.add('hidden');
+                }, 1000);
+            }, 800);
+
+
+            initEngine();
+            setupUIListeners();
+            animate();
+        };
+
+
+        // Core Three.js Scene Setup
+        function initEngine() {
+            const canvas = document.getElementById('galaxy-canvas');
+            clock = new THREE.Clock();
+
+
+            // Scene Creation
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2('#010105', 0.015);
+
+
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(10, 12, 18);
+
+
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                antialias: true,
+                alpha: false,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+
+            // Orbit Controls setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enableZoom = true;
+            controls.enablePan = true;
+            controls.zoomSpeed = 1.5;
+            controls.minDistance = 2;
+            controls.maxDistance = 80;
+
+            // Auto-focus canvas for zoom in iframe
+            setTimeout(() => {
+              canvas.tabIndex = 1;
+              canvas.focus();
+              canvas.style.outline = 'none';
+            }, 100);
+
+
+            // Singularity Mesh Core setup (Event horizon + glowing ring)
+            const blackHoleGeo = new THREE.SphereGeometry(0.5, 32, 32);
+            const blackHoleMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            blackHole = new THREE.Mesh(blackHoleGeo, blackHoleMat);
+            scene.add(blackHole);
+
+
+            const accretionGeo = new THREE.RingGeometry(0.55, 1.2, 32);
+            // Generate glowing canvas texture gradient for central halo
+            const haloTexture = createRadialTexture('#ffe58f', 'rgba(255, 69, 0, 0.5)', true);
+            const accretionMat = new THREE.MeshBasicMaterial({
+                map: haloTexture,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const accretionDisk = new THREE.Mesh(accretionGeo, accretionMat);
+            accretionDisk.rotation.x = Math.PI / 2;
+            blackHole.add(accretionDisk);
+
+
+            // Generate procedural galaxy particle buffers
+            generateGalaxy();
+
+
+            // Setup Resize Guard
+            window.addEventListener('resize', onWindowResize);
+        }
+
+
+        // Generator functions for custom glow sprite textures
+        function createRadialTexture(innerColor, outerColor, isAccretion = false) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, innerColor);
+            gradient.addColorStop(isAccretion ? 0.3 : 0.15, innerColor);
+            gradient.addColorStop(0.5, outerColor);
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+
+        // Complete Procedural Galaxy Coordinates Setup
+        function generateGalaxy() {
+            // Clean up existing buffers if rebuilding
+            if (galaxyPoints) {
+                galaxyGeometry.dispose();
+                galaxyMaterial.dispose();
+                scene.remove(galaxyPoints);
+            }
+            if (nebulaPoints) {
+                nebulaGeometry.dispose();
+                nebulaMaterial.dispose();
+                scene.remove(nebulaPoints);
+            }
+
+
+            // --- 1. CORE STARS GENERATION ---
+            galaxyGeometry = new THREE.BufferGeometry();
+            
+            const count = parameters.count;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const initialAngles = new Float32Array(count); // cache angles to calculate smooth orbital mechanics
+
+
+            const colorInside = new THREE.Color(parameters.insideColor);
+            const colorMiddle = new THREE.Color(parameters.middleColor);
+            const colorOutside = new THREE.Color(parameters.outsideColor);
+
+
+            for (let i = 0; i < count; i++) {
+                const i3 = i * 3;
+
+
+                // Radius distribution (clumped heavier near the center)
+                const radius = Math.pow(Math.random(), 2.2) * parameters.radius;
+                const radiusRatio = radius / parameters.radius;
+
+
+                // Set branch offset angle
+                const branchAngle = ((i % parameters.branches) / parameters.branches) * Math.PI * 2;
+                
+                // Spiral twist coefficient
+                const spinAngle = radius * parameters.spin;
+
+
+                // Capture initial coordinate geometry position
+                initialAngles[i] = branchAngle + spinAngle;
+
+
+                // Natural radial scattering dispersion logic
+                const randomX = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * parameters.randomness * radius;
+                const randomY = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * parameters.randomness * radius;
+                const randomZ = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * parameters.randomness * radius;
+
+
+                positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+                positions[i3 + 1] = randomY;
+                positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+
+
+                // Colorful dynamic interpolation: Core -> Nebula Cluster -> Galactic Corona
+                let mixedColor = colorInside.clone();
+                if (radiusRatio < 0.35) {
+                    mixedColor.lerp(colorMiddle, radiusRatio / 0.35);
+                } else {
+                    mixedColor.lerp(colorOutside, (radiusRatio - 0.35) / 0.65);
+                }
+
+
+                // Star brightness variations
+                const brightnessScale = 0.5 + Math.random() * 0.5;
+                colors[i3] = mixedColor.r * brightnessScale;
+                colors[i3 + 1] = mixedColor.g * brightnessScale;
+                colors[i3 + 2] = mixedColor.b * brightnessScale;
+            }
+
+
+            galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            galaxyGeometry.setAttribute('initialAngle', new THREE.BufferAttribute(initialAngles, 1));
+
+
+            // Generate beautifully softened custom star textures
+            const starTexture = createRadialTexture('#ffffff', 'rgba(255, 255, 255, 0.4)');
+            
+            galaxyMaterial = new THREE.PointsMaterial({
+                size: parameters.size,
+                sizeAttenuation: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                vertexColors: true,
+                map: starTexture,
+                transparent: true
+            });
+
+
+            galaxyPoints = new THREE.Points(galaxyGeometry, galaxyMaterial);
+            scene.add(galaxyPoints);
+
+
+
+            // --- 2. GASEOUS NEBULA DUST GENERATION ---
+            const nebulaCount = Math.floor(parameters.count * 0.12);
+            nebulaGeometry = new THREE.BufferGeometry();
+            
+            const nebPositions = new Float32Array(nebulaCount * 3);
+            const nebColors = new Float32Array(nebulaCount * 3);
+
+
+            for (let i = 0; i < nebulaCount; i++) {
+                const i3 = i * 3;
+                
+                const radius = Math.pow(Math.random(), 1.5) * parameters.radius * 1.1;
+                const radiusRatio = radius / parameters.radius;
+                
+                const branchAngle = ((i % parameters.branches) / parameters.branches) * Math.PI * 2;
+                const spinAngle = radius * parameters.spin;
+
+
+                // Heavily scattered randomness for gas clouds
+                const nebScattering = parameters.randomness * 1.8;
+                const randomX = Math.pow(Math.random(), 2.5) * (Math.random() < 0.5 ? 1 : -1) * nebScattering * radius;
+                const randomY = (Math.random() - 0.5) * (parameters.randomness * 0.8) * (1.5 - radiusRatio);
+                const randomZ = Math.pow(Math.random(), 2.5) * (Math.random() < 0.5 ? 1 : -1) * nebScattering * radius;
+
+
+                nebPositions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+                nebPositions[i3 + 1] = randomY;
+                nebPositions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+
+
+                // Soft gas hues
+                let mixedColor = colorMiddle.clone();
+                if (radiusRatio > 0.5) {
+                    mixedColor.lerp(colorOutside, (radiusRatio - 0.5) / 0.5);
+                } else {
+                    mixedColor.lerp(colorInside, (0.5 - radiusRatio) / 0.5);
+                }
+
+
+                nebColors[i3] = mixedColor.r * 0.35;
+                nebColors[i3 + 1] = mixedColor.g * 0.35;
+                nebColors[i3 + 2] = mixedColor.b * 0.35;
+            }
+
+
+            nebulaGeometry.setAttribute('position', new THREE.BufferAttribute(nebPositions, 3));
+            nebulaGeometry.setAttribute('color', new THREE.BufferAttribute(nebColors, 3));
+
+
+            // Generate extremely soft cloud texture
+            const cloudTexture = createRadialTexture('rgba(255,255,255,0.4)', 'rgba(255,255,255,0)');
+
+
+            nebulaMaterial = new THREE.PointsMaterial({
+                size: parameters.size * 32, // Large cloudy particles
+                sizeAttenuation: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                vertexColors: true,
+                map: cloudTexture,
+                transparent: true,
+                opacity: 0.16
+            });
+
+
+            nebulaPoints = new THREE.Points(nebulaGeometry, nebulaMaterial);
+            scene.add(nebulaPoints);
+
+
+            // Sync dynamic Telemetry values
+            document.getElementById('diag-particles').textContent = parameters.count.toLocaleString();
+            document.getElementById('diag-nebula').textContent = nebulaCount.toLocaleString();
+        }
+
+
+        // Safe Audio Context Activation (Required by Browser Autoplay policies)
+        function toggleAudio() {
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Main sweep oscillator
+                    ambientOsc = audioCtx.createOscillator();
+                    ambientOsc.type = 'sawtooth';
+                    ambientOsc.frequency.setValueAtTime(45, audioCtx.currentTime); // Deep resonant G1
+                    
+                    // High frequency detail sweep
+                    const minorOsc = audioCtx.createOscillator();
+                    minorOsc.type = 'sine';
+                    minorOsc.frequency.setValueAtTime(90, audioCtx.currentTime);
+
+
+                    // Low-Pass filter to sweep mapping
+                    ambientFilter = audioCtx.createBiquadFilter();
+                    ambientFilter.type = 'lowpass';
+                    ambientFilter.Q.setValueAtTime(9, audioCtx.currentTime);
+                    ambientFilter.frequency.setValueAtTime(140, audioCtx.currentTime);
+
+
+                    droneGain = audioCtx.createGain();
+                    droneGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+
+
+                    // Routing
+                    ambientOsc.connect(ambientFilter);
+                    minorOsc.connect(ambientFilter);
+                    ambientFilter.connect(droneGain);
+                    droneGain.connect(audioCtx.destination);
+
+
+                    ambientOsc.start();
+                    minorOsc.start();
+                } catch (e) {
+                    console.warn("Web Audio API not fully compatible in this sandbox framework.", e);
+                    return;
+                }
+            }
+
+
+            if (isAudioPlaying) {
+                // Fade out softly
+                droneGain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                setTimeout(() => {
+                    if (!isAudioPlaying) droneGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                }, 500);
+                document.getElementById('audio-icon').className = 'fa-solid fa-volume-xmark text-lg text-rose-500';
+                document.getElementById('btn-audio').classList.remove('glass-panel-active');
+                addSystemLog("<i class='fa-solid fa-volume-xmark text-rose-400 mr-1'></i>Ambient synthesizer disconnected.");
+                isAudioPlaying = false;
+            } else {
+                // Resume audio if suspended
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                // Fade in softly
+                droneGain.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 1.0);
+                document.getElementById('audio-icon').className = 'fa-solid fa-volume-high text-lg text-cyan-400';
+                document.getElementById('btn-audio').classList.add('glass-panel-active');
+                addSystemLog("<i class='fa-solid fa-volume-high text-cyan-400 mr-1'></i>Ambient synthesizer initialized.");
+                isAudioPlaying = true;
+            }
+        }
+
+
+        // Window resize update
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+
+        // Setup HUD interactive UI listeners & hooks
+        function setupUIListeners() {
+            // Sliders values mapping
+            const setupSlider = (id, paramName, unit = '', displayMultiplier = 1) => {
+                const el = document.getElementById(`param-${paramName}`);
+                const valDisp = document.getElementById(`val-${paramName}`);
+                
+                el.addEventListener('input', (e) => {
+                    let parsedVal = parseFloat(e.target.value);
+                    parameters[paramName] = parsedVal;
+                    
+                    // Display formatting
+                    let displayVal = parsedVal * displayMultiplier;
+                    if (Number.isInteger(displayVal)) {
+                        valDisp.textContent = displayVal.toLocaleString() + unit;
+                    } else {
+                        valDisp.textContent = displayVal.toFixed(2) + unit;
+                    }
+
+
+                    // On-the-fly rebuild for structure breaking variables
+                    if (paramName === 'count' || paramName === 'branches' || paramName === 'randomness') {
+                        generateGalaxy();
+                    }
+                    
+                    // Update scientific metrics in real time
+                    updateScientificTelemetry();
+                });
+            };
+
+
+            setupSlider('param-count', 'count');
+            setupSlider('param-radius', 'radius', 'k ly', 1000);
+            setupSlider('param-branches', 'branches');
+            setupSlider('param-spin', 'spin');
+            setupSlider('param-randomness', 'randomness');
+            setupSlider('param-rotation', 'rotation', 'x');
+
+
+            // Color pickers logic
+            document.getElementById('color-inside').addEventListener('input', (e) => {
+                parameters.insideColor = e.target.value;
+                generateGalaxy();
+            });
+            document.getElementById('color-middle').addEventListener('input', (e) => {
+                parameters.middleColor = e.target.value;
+                generateGalaxy();
+            });
+            document.getElementById('color-outside').addEventListener('input', (e) => {
+                parameters.outsideColor = e.target.value;
+                generateGalaxy();
+            });
+
+
+            // Action Buttons
+            document.getElementById('btn-audio').addEventListener('click', toggleAudio);
+            
+            // Hide/Show HUD Toggle
+            let hudVisible = true;
+            const toggleHUD = () => {
+                const hud = document.getElementById('hud-container');
+                const floatingBtn = document.getElementById('btn-floating-hide');
+                const headerBtn = document.getElementById('btn-hide-hud');
+                hudVisible = !hudVisible;
+                if (hudVisible) {
+                    hud.style.opacity = '1';
+                    hud.style.pointerEvents = 'auto';
+                    floatingBtn.innerHTML = '<i class="fa-solid fa-eye-slash text-lg"></i>';
+                    floatingBtn.classList.remove('text-cyan-400');
+                    floatingBtn.classList.add('text-yellow-400');
+                    if (headerBtn) {
+                        headerBtn.innerHTML = '<i class="fa-solid fa-eye-slash text-lg"></i>';
+                    }
+                    addSystemLog("<i class='fa-solid fa-eye text-cyan-400 mr-1'></i>Observatory HUD restored.");
+                } else {
+                    hud.style.opacity = '0';
+                    hud.style.pointerEvents = 'none';
+                    floatingBtn.innerHTML = '<i class="fa-solid fa-eye text-lg"></i>';
+                    floatingBtn.classList.remove('text-yellow-400');
+                    floatingBtn.classList.add('text-cyan-400');
+                    if (headerBtn) {
+                        headerBtn.innerHTML = '<i class="fa-solid fa-eye text-lg"></i>';
+                    }
+                }
+            };
+            document.getElementById('btn-hide-hud').addEventListener('click', toggleHUD);
+            document.getElementById('btn-floating-hide').addEventListener('click', toggleHUD);
+            
+            document.getElementById('btn-reset-cam').addEventListener('click', () => {
+                controls.reset();
+                camera.position.set(10, 12, 18);
+                controls.target.set(0, 0, 0);
+                addSystemLog("<i class='fa-solid fa-crosshairs text-cyan-400 mr-1'></i>Observatory camera orientation realigned.");
+            });
+
+
+            // Modal logic
+            const infoModal = document.getElementById('info-modal');
+            const showModal = () => {
+                infoModal.classList.remove('pointer-events-none', 'opacity-0');
+            };
+            const hideModal = () => {
+                infoModal.classList.add('pointer-events-none', 'opacity-0');
+            };
+            
+            document.getElementById('btn-info').addEventListener('click', showModal);
+            document.getElementById('btn-close-modal').addEventListener('click', hideModal);
+            document.getElementById('btn-modal-okay').addEventListener('click', hideModal);
+
+
+            // Preset Buttons Selection
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const preset = e.currentTarget.getAttribute('data-preset');
+                    applyPreset(preset);
+                    
+                    // visual active feedback
+                    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('border-cyan-400', 'bg-cyan-950/30', 'text-cyan-200'));
+                    e.currentTarget.classList.add('border-cyan-400', 'bg-cyan-950/30', 'text-cyan-200');
+                });
+            });
+
+
+            // Cinematic Path mode toggle
+            document.getElementById('btn-cinematic').addEventListener('click', () => {
+                parameters.cinematicActive = !parameters.cinematicActive;
+                const icon = document.getElementById('cinematic-icon');
+                const btn = document.getElementById('btn-cinematic');
+                if (parameters.cinematicActive) {
+                    icon.className = 'fa-solid fa-stop text-xs text-cyan-400';
+                    btn.classList.add('glass-panel-active');
+                    addSystemLog("<i class='fa-solid fa-play text-cyan-400 mr-1'></i>Cinematic navigation tracking initiated.");
+                } else {
+                    icon.className = 'fa-solid fa-play text-xs text-purple-300';
+                    btn.classList.remove('glass-panel-active');
+                    addSystemLog("<i class='fa-solid fa-stop text-purple-400 mr-1'></i>Manual flight controls restored.");
+                }
+            });
+
+
+            // Warp drive simulation mode toggle
+            document.getElementById('btn-warp').addEventListener('click', () => {
+                parameters.warpSpeedActive = !parameters.warpSpeedActive;
+                const icon = document.getElementById('warp-icon');
+                const btn = document.getElementById('btn-warp');
+                const overlay = document.getElementById('warp-overlay');
+                
+                if (parameters.warpSpeedActive) {
+                    icon.className = 'fa-solid fa-circle-notch animate-spin text-xs text-cyan-300';
+                    btn.classList.add('glass-panel-active');
+                    overlay.style.opacity = '1';
+                    addSystemLog("<i class='fa-solid fa-bolt text-cyan-400 mr-1'></i>Warp drive sequence engaged.");
+                } else {
+                    icon.className = 'fa-solid fa-bolt text-xs text-cyan-300';
+                    btn.classList.remove('glass-panel-active');
+                    overlay.style.opacity = '0';
+                    addSystemLog("<i class='fa-solid fa-rocket text-purple-400 mr-1'></i>Decelerated back to normal sub-light speed.");
+                }
+            });
+
+
+            // Set default preset active style on Milky Way
+            document.querySelector('[data-preset="milky-way"]').click();
+        }
+
+
+        // Apply pre-configured scientific styles
+        function applyPreset(presetName) {
+            let config = {};
+
+
+            switch (presetName) {
+                case 'milky-way':
+                    config = {
+                        count: 85000,
+                        radius: 14,
+                        branches: 4,
+                        spin: 1.6,
+                        randomness: 0.42,
+                        insideColor: '#ffe58f', // warm center
+                        middleColor: '#d153ff', // pink purple nebula clouds
+                        outsideColor: '#00d2ff', // blue halo
+                        rotationSpeed: 0.12,
+                    };
+                    addSystemLog("<i class='fa-solid fa-satellite text-cyan-400 mr-1'></i>Milky Way coordinates loaded.");
+                    break;
+                case 'andromeda':
+                    config = {
+                        count: 110000,
+                        radius: 18,
+                        branches: 2,
+                        spin: 1.85,
+                        randomness: 0.38,
+                        insideColor: '#fffac8', // yellowish star core
+                        middleColor: '#fa1d4f', // deep red/pink nebula core
+                        outsideColor: '#53ffcc', // teal edge stars
+                        rotationSpeed: 0.08,
+                    };
+                    addSystemLog("<i class='fa-solid fa-satellite text-cyan-400 mr-1'></i>Andromeda configuration synchronized.");
+                    break;
+                case 'black-hole':
+                    config = {
+                        count: 140000,
+                        radius: 7.5,
+                        branches: 6,
+                        spin: 3.8,
+                        randomness: 0.22,
+                        insideColor: '#ffffff', // bright accretion core
+                        middleColor: '#fd7e14', // hot stellar plasma
+                        outsideColor: '#020208', // dark background blend
+                        rotationSpeed: 2.2, // hyper velocity
+                    };
+                    addSystemLog("<i class='fa-solid fa-circle text-red-500 mr-1'></i>Severe singularity pull detected near nucleus!");
+                    break;
+                case 'ring':
+                    config = {
+                        count: 65000,
+                        radius: 12,
+                        branches: 1, // continuous ring orbit
+                        spin: 0.1,
+                        randomness: 0.65,
+                        insideColor: '#ff2a85',
+                        middleColor: '#a100ff',
+                        outsideColor: '#00ffff',
+                        rotationSpeed: 0.15,
+                    };
+                    addSystemLog("<i class='fa-solid fa-bullseye text-cyan-400 mr-1'></i>Symmetric resonant ring matrix established.");
+                    break;
+            }
+
+
+            // Bind values to controls inputs physically
+            for (let prop in config) {
+                parameters[prop] = config[prop];
+                
+                const slider = document.getElementById(`param-${prop}`);
+                const display = document.getElementById(`val-${prop}`);
+                const colorInput = document.getElementById(`color-${prop}`);
+
+
+                if (slider) slider.value = config[prop];
+                if (colorInput) colorInput.value = config[prop];
+                
+                // Format label displays
+                if (display) {
+                    if (prop === 'radius') {
+                        display.textContent = (config[prop] * 1000).toLocaleString() + 'k ly';
+                    } else if (prop === 'rotation') {
+                        display.textContent = config[prop].toFixed(1) + 'x';
+                    } else {
+                        display.textContent = config[prop].toLocaleString();
+                    }
+                }
+            }
+
+
+            // Regenerate the world coordinates
+            generateGalaxy();
+            updateScientificTelemetry();
+        }
+
+
+        // Real-time scientific dashboard calculation mechanics
+        function updateScientificTelemetry() {
+            // Math estimations based loosely on parameter scale factors
+            const calculatedMass = (parameters.count * 15 * parameters.radius).toFixed(2);
+            const centralSingularityMass = (parameters.spin * 2.85 + 1.2).toFixed(1);
+            const distance = Math.floor(camera.position.distanceTo(new THREE.Vector3(0,0,0)) * 2420);
+            const orbitPeriod = Math.floor(parameters.radius * 16.5);
+
+
+            document.getElementById('stat-distance').textContent = `${distance.toLocaleString()} Light Years`;
+            document.getElementById('stat-period').textContent = `${orbitPeriod} Million Years`;
+            document.getElementById('stat-mass').textContent = `${calculatedMass} Billion Sol`;
+            document.getElementById('stat-singularity').textContent = `${centralSingularityMass} Million Sol`;
+        }
+
+
+        // Custom Console log helper
+        function addSystemLog(htmlContent) {
+            const el = document.getElementById('system-log');
+            el.innerHTML = htmlContent;
+        }
+
+
+        // Animation rendering loop frame-by-frame
+        function animate() {
+            requestAnimationFrame(animate);
+
+
+            const elapsedTime = clock.getElapsedTime();
+            const delta = clock.getDelta();
+
+
+            // Handle Performance Diagnostics FPS calculation
+            const now = performance.now();
+            stats.frameTime += (now - stats.lastFrame - stats.frameTime) * 0.1;
+            stats.lastFrame = now;
+            stats.fps = Math.round(1000 / stats.frameTime);
+            
+            if (Math.random() < 0.05) { // update FPS readouts lazily to avoid heavy DOM paint
+                document.getElementById('load-fps').textContent = `${stats.fps} FPS`;
+                if (stats.fps < 40) {
+                    document.getElementById('load-fps').className = 'font-bold text-red-500 animate-pulse';
+                } else if (stats.fps < 50) {
+                    document.getElementById('load-fps').className = 'font-bold text-amber-500';
+                } else {
+                    document.getElementById('load-fps').className = 'font-bold text-emerald-400';
+                }
+            }
+
+
+            // Update real-time distance metrics dynamically as camera orbits
+            updateScientificTelemetry();
+
+
+            // Auto rotation mechanics for the star cluster
+            if (galaxyPoints && isSimRunning) {
+                const rotationFactor = elapsedTime * parameters.rotationSpeed * 0.15;
+                
+                // Spin Galaxy points buffer slowly
+                galaxyPoints.rotation.y = rotationFactor;
+                nebulaPoints.rotation.y = rotationFactor;
+
+
+                // Accretion disk spinning counter-clockwise
+                if (blackHole) {
+                    blackHole.children[0].rotation.z = -elapsedTime * (parameters.rotationSpeed * 0.8 + 0.5);
+                }
+
+
+                // Web Audio synth resonance mapping
+                if (isAudioPlaying && ambientFilter) {
+                    // sweep low-pass filter frequency directly based on rotational speed
+                    const normalizedVelocity = Math.max(0.1, Math.min(parameters.rotationSpeed * 100, 400));
+                    ambientFilter.frequency.exponentialRampToValueAtTime(120 + normalizedVelocity, audioCtx.currentTime + 0.1);
+                }
+
+
+                // If Warp drive is engaged, stretch the stellar points to mimic linear motion lines
+                if (parameters.warpSpeedActive) {
+                    galaxyMaterial.size = parameters.size * 1.8;
+                    nebulaMaterial.size = parameters.size * 42;
+                    galaxyPoints.rotation.x = Math.sin(elapsedTime * 0.2) * 0.08;
+                    galaxyPoints.rotation.z = Math.cos(elapsedTime * 0.2) * 0.08;
+                    
+                    // Create zooming visual movement inside the particles using camera drift
+                    camera.position.z += Math.sin(elapsedTime * 2) * 0.005;
+                } else {
+                    galaxyMaterial.size = parameters.size;
+                    nebulaMaterial.size = parameters.size * 32;
+                }
+            }
+
+
+            // If cinematic pathing is active, rotate the camera automatically in orbital vectors
+            if (parameters.cinematicActive) {
+                const orbitRadius = parameters.radius * 1.5;
+                camera.position.x = Math.cos(elapsedTime * 0.1) * orbitRadius;
+                camera.position.z = Math.sin(elapsedTime * 0.1) * orbitRadius;
+                camera.position.y = Math.sin(elapsedTime * 0.05) * (parameters.radius * 0.5) + (parameters.radius * 0.4);
+                camera.lookAt(0, 0, 0);
+            }
+
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
