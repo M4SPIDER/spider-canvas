@@ -10,3 +10,62 @@
 *:focus-visible {
   outline: none;
 }
+
+/* Mobile touch optimizations */
+@media (max-width: 768px) {
+  /* Prevent pull-to-refresh and overscroll */
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  /* Make textarea touch-friendly */
+  textarea {
+    -webkit-appearance: none;
+    appearance: none;
+    font-size: 16px !important; /* Prevent iOS zoom */
+    touch-action: manipulation;
+  }
+  
+  /* Code editor textarea - prevent zoom on focus */
+  .code-editor textarea {
+    font-size: 14px !important;
+    min-height: 200px !important;
+    padding: 12px !important;
+  }
+  
+  /* Fullscreen fixes for Android */
+  .fullscreen-mode {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important; /* Dynamic viewport height */
+    z-index: 9999 !important;
+  }
+  
+  /* Canvas panel mobile positioning */
+  .canvas-panel-mobile {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* Safe area insets for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Landscape mode optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  .landscape-compact {
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}

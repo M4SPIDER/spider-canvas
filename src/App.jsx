@@ -1125,9 +1125,13 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F12' || e.key === 'Escape') {
-        if (document.fullscreenElement) {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
           e.preventDefault();
-          document.exitFullscreen().catch(err => console.log(err));
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(err => console.log(err));
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          }
           setIsFullscreen(false);
         }
       }
@@ -1135,17 +1139,24 @@ export default function App() {
 
 
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFullscreen(isFull);
+      // Remove CSS fallback class if native fullscreen is active
+      if (isFull) {
+        canvasContainerRef.current?.classList.remove('fullscreen-mode');
+      }
     };
 
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
   }, []);
 
@@ -1153,16 +1164,38 @@ export default function App() {
   const toggleFullScreen = async () => {
     if (!canvasContainerRef.current) return;
 
-
-    if (!document.fullscreenElement) {
+    // Mobile: Use CSS-based fullscreen fallback
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
       try {
-        await canvasContainerRef.current.requestFullscreen();
+        const elem = canvasContainerRef.current;
+        // Try native fullscreen first
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else {
+          // Fallback: CSS-based fullscreen for Android
+          elem.classList.add('fullscreen-mode');
+          setIsFullscreen(true);
+          return;
+        }
         setIsFullscreen(true);
       } catch (err) {
-        console.error("Error attempting to enable full-screen mode:", err);
+        console.log("Fullscreen not supported, using CSS fallback");
+        canvasContainerRef.current.classList.add('fullscreen-mode');
+        setIsFullscreen(true);
       }
     } else {
-      document.exitFullscreen();
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        }
+      } catch (err) {
+        // Fallback: remove CSS fullscreen
+      }
+      canvasContainerRef.current?.classList.remove('fullscreen-mode');
       setIsFullscreen(false);
     }
   };
@@ -1633,7 +1666,6 @@ export default function App() {
 
       {/* --- Sidebar / Chat Panel --- */}
       <div 
-        style={{ width: isDesktop && isCanvasOpen ? `${sidebarWidth}px` : undefined }}
         className={`
           flex flex-col h-full bg-white border-r border-slate-200 absolute md:relative z-10
           ${isDragging ? 'transition-none' : 'transition-all duration-300 ease-in-out'}
@@ -1641,6 +1673,7 @@ export default function App() {
             ? 'w-full -translate-x-full md:translate-x-0 opacity-0 md:opacity-100 pointer-events-none md:pointer-events-auto' 
             : 'w-full translate-x-0 opacity-100 pointer-events-auto'}
         `}
+        style={isDesktop && isCanvasOpen ? { width: `${sidebarWidth}px` } : undefined}
       >
         
         {/* Resize Handle (Desktop Only) */}
@@ -1839,7 +1872,11 @@ export default function App() {
               rows={1}
               disabled={isStreaming}
               className="w-full py-3 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400 resize-none max-h-32 disabled:opacity-50"
-              style={{ minHeight: '44px' }} 
+              style={{ 
+                minHeight: '44px',
+                fontSize: '16px',
+                touchAction: 'manipulation'
+              }}
             />
             
             {isStreaming ? (
@@ -1865,10 +1902,13 @@ export default function App() {
 
 
       {/* --- Canvas / Preview Panel --- */}
-      <main className={`
-        flex-col bg-slate-50/50 absolute inset-0 md:relative z-30 md:z-0 md:flex h-full
-        ${isCanvasOpen ? 'flex animate-in slide-in-from-right-4 duration-300' : 'hidden'}
-      `}>
+      <main 
+        className={`
+          flex-col bg-slate-50/50 absolute inset-0 md:relative z-30 md:z-0 md:flex h-full w-full
+          ${isCanvasOpen ? 'flex animate-in slide-in-from-right-4 duration-300' : 'hidden'}
+        `}
+        style={{ height: '100dvh' }}
+      >
         
         {/* Canvas Toolbar / Header */}
         <header className="h-14 min-h-[3.5rem] border-b border-slate-200 flex items-center justify-between px-4 bg-white/80 backdrop-blur sticky top-0 z-40">
@@ -1988,7 +2028,7 @@ export default function App() {
               </div>
             )
           ) : (
-            <div className="w-full h-full bg-[#1e293b] flex flex-col font-mono text-sm overflow-hidden">
+            <div className="w-full h-full bg-[#1e293b] flex flex-col font-mono text-sm overflow-hidden code-editor">
               <div className="flex items-center justify-between px-4 py-3 bg-[#0f172a] border-b border-slate-700 text-slate-400">
                 <span className="text-xs font-medium uppercase tracking-wider flex items-center gap-2">
                   <Edit3 className="w-3 h-3 text-indigo-400" />
@@ -2001,14 +2041,19 @@ export default function App() {
                 onChange={(e) => setActiveArtifact({ ...activeArtifact, code: e.target.value })}
                 className="flex-1 w-full bg-transparent text-blue-100 p-4 sm:p-6 focus:outline-none resize-none overflow-auto scrollbar-thin scrollbar-thumb-slate-600"
                 spellCheck={false}
+                style={{ 
+                  minHeight: '150px',
+                  fontSize: 'clamp(12px, 2.5vw, 14px)',
+                  touchAction: ' manipulation'
+                }}
               />
             </div>
           )}
           
           {/* Full Screen Exit Hint */}
           {isFullscreen && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full backdrop-blur-sm text-xs border border-white/20 pointer-events-none opacity-50 hover:opacity-100 transition">
-              Press F12 or Esc to exit full screen
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full backdrop-blur-sm text-xs border border-white/20 pointer-events-none opacity-70 hover:opacity-100 transition z-50">
+              {navigator.userAgent.includes('Android') ? 'Tap Esc or back button to exit' : 'Press F12 or Esc to exit full screen'}
             </div>
           )}
         </div>
