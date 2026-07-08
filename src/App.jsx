@@ -114,19 +114,9 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
     let blobContent = '';
     const rawContent = content || '';
 
-    // --- SMART TYPE DETECTION ---
-    // Force HTML mode if the content starts with typical HTML doctypes/tags, 
-    // overriding the 'type' prop which might be stale (e.g., 'react')
-    let renderType = type;
-    const trimmed = rawContent.trim();
-    if (trimmed.startsWith('<!DOCTYPE html>') || trimmed.startsWith('<html')) {
-      renderType = 'html';
-    }
-
     // --- Template for React Components ---
-    if (renderType === 'react') {
-      // CRITICAL FIX: Escape closing script tags to prevent self-breaking when previewing this file itself
-      const encodedCode = JSON.stringify(rawContent).replace(/<\/script/g, '<\\/script');
+    if (type === 'react') {
+      const encodedCode = JSON.stringify(rawContent);
 
       blobContent = `
 <!DOCTYPE html>
@@ -144,12 +134,8 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
     
     <!-- 3. Icon Library (Vanilla Lucide UMD) -->
     <script src="https://unpkg.com/lucide@0.292.0/dist/umd/lucide.min.js"></script>
-
-    <!-- 4. 3D Engine Support (FIXED: Added Three.js & Fiber) -->
-    <script crossorigin src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script crossorigin src="https://unpkg.com/@react-three/fiber@8.15.12/dist/react-three-fiber.min.js"></script>
     
-    <!-- 5. Compiler -->
+    <!-- 4. Compiler -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -280,17 +266,12 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
         }
       });
 
-      // 4. Module Shim (FIXED: Added Three and Fiber mappings)
+      // 4. Module Shim
       window.require = (moduleName) => {
         if (moduleName === 'react') return window.React;
-        if (moduleName === 'react-dom' || moduleName === 'react-dom/client') return window.ReactDOM;
+        if (moduleName === 'react-dom') return window.ReactDOM;
         if (moduleName === 'lucide-react') return LucideIconProxy;
         if (moduleName === 'recharts') return window.Recharts || {}; 
-        
-        // --- 3D Support ---
-        if (moduleName === 'three') return window.THREE;
-        if (moduleName === '@react-three/fiber') return window.ReactThreeFiber;
-        
         return {}; 
       };
       
@@ -359,28 +340,21 @@ const ArtifactPreview = ({ content, type, deviceMode }) => {
 </html>`;
     } 
     // --- HTML Fallback ---
-    else if (renderType === 'html') {
-      // Check if it's a full HTML document (Smart check)
-      if (rawContent.includes('<!DOCTYPE html>') || rawContent.includes('<html')) {
-          blobContent = rawContent;
-      } else {
-          // It's a fragment, wrap it
-          const safeHtmlContent = rawContent;
-          blobContent = `
+    else if (type === 'html') {
+      const safeHtmlContent = rawContent;
+      blobContent = `
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <style>html,body{margin:0;height:100%;background:#000;color:white;}</style>
   </head>
   <body>
     ${safeHtmlContent}
   </body>
 </html>`;
-      }
     } else {
       const safeFallbackContent = rawContent.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       blobContent = `<html><body style="margin:0;padding:1rem;background:#fff;"><pre style="font-family:monospace;">` + safeFallbackContent + `</pre></body></html>`;
@@ -1017,7 +991,7 @@ export default function App() {
     
     // Auto-inject prompt if sending image without text
     if (!userText.trim() && attachedFile) {
-          userText = attachedFile.type === 'image' ? "Analyze this image." : "Analyze this file.";
+         userText = attachedFile.type === 'image' ? "Analyze this image." : "Analyze this file.";
     }
 
     const cleanPrompt = userText.trim().toLowerCase();
